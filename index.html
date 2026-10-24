@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Solo Etude - Clean TAB & Piano Only</title>
+  <title>Jazz Solo Etude - Linear Phrases & Strict Non-Open TAB</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -28,7 +28,7 @@
     .abcjs-chord { font-size: 15px !important; font-weight: 800 !important; fill: #0f172a !important; }
     .abcjs-annotation { font-size: 11px !important; font-weight: 700 !important; fill: #b45309 !important; font-family: sans-serif !important; }
 
-    /* TAB譜 */
+    /* TAB譜スタイル */
     .abcjs-tablature line { stroke: #cbd5e1; }
     .abcjs-tablature text { fill: #0f172a; font-weight: bold; font-family: monospace; font-size: 13px; }
     
@@ -151,6 +151,10 @@
       'B': []
     };
 
+    // ギター開放弦ピッチ（これらは物理的に一切生成しない）
+    // E2=40, A2=45, D3=50, G3=55, B3=59, E4=64
+    const GUITAR_OPEN_PITCHES = [40, 45, 50, 55, 59, 64];
+
     function App() {
       const [measureCount, setMeasureCount] = useState(32);
       const [bpm, setBpm] = useState(130);
@@ -198,12 +202,10 @@
         }
       }, [abcjsLoaded, chords]);
 
-      // 譜面とTABのレンダリング
       useEffect(() => {
         if (abcjsLoaded && abcString && window.ABCJS) {
           let tablatureOptions = [];
           if (tabView === 'guitar') {
-            // 開放弦ピッチ（40, 45, 50, 55, 59, 64）を回避するチューニング定義
             tablatureOptions = [{
               instrument: 'guitar',
               label: 'TAB (Gt)',
@@ -325,7 +327,7 @@
         }
       };
 
-      // 【調号に完全対応】二重フラットを徹底排除する音名生成
+      // 調号に応じた音名変換（二重フラットの排除）
       const midiToAbcByKey = (midi, keySig, measureAccRef) => {
         const flatsInKey = KEY_FLATS[keySig] || [];
         const pitchClass = midi % 12;
@@ -345,7 +347,7 @@
           case 7:  baseName = "G"; break;
           case 8:  baseName = "A"; if (!flatsInKey.includes('A')) requiresAcc = "_"; break;
           case 9:  baseName = "A"; if (flatsInKey.includes('A')) requiresAcc = "="; break;
-          case 10: baseName = "B"; if (!flatsInKey.includes('B')) requiresAcc = "_"; break; // 調号にあれば不要
+          case 10: baseName = "B"; if (!flatsInKey.includes('B')) requiresAcc = "_"; break;
           case 11: baseName = "B"; if (flatsInKey.includes('B')) requiresAcc = "="; break;
         }
 
@@ -374,13 +376,12 @@
         return prefix + abc;
       };
 
-      // ピアノ伴奏用（4つ打ち・2ビートのジャズコンピング）
+      // ピアノ伴奏用（Root + 3rd + 7thのコンピング）
       const getPianoCompingAbc = (chordStr, keySig, accRef) => {
         const match = chordStr.match(/^[A-G][#b]?/);
         const root = match ? match[0] : 'C';
         const rootPitch = PITCH_CLASSES[root] || 0;
         
-        // ピアノ用ボイシング (Root + 3rd + 7th)
         const isMinor = chordStr.includes('m') && !chordStr.includes('maj');
         const thirdPitch = rootPitch + (isMinor ? 3 : 4);
         const seventhPitch = rootPitch + (chordStr.includes('maj') || chordStr.includes('M7') ? 11 : 10);
@@ -392,7 +393,7 @@
         return `[${r}${t}${s}]4 [${r}${t}${s}]4`;
       };
 
-      // フレーズ生成エンジン（開放弦の完全排除：音域を5フレット以上に厳格固定）
+      // フレーズ生成エンジン（同音重複の禁止 ＆ 開放弦ピッチの物理的除外）
       const generateEtude = () => {
         let displayMelody = "";
         let audioMelody = "";
@@ -400,12 +401,11 @@
 
         const keySig = currentSong.key || "C";
 
-        // 開放弦（E2=40, A2=45, D3=50, G3=55, B3=59, E4=64）が物理的に一切選ばれない音域
-        // 5フレット以上（A3=57 〜 C6=84）のボックスポジションに完全制御
+        // ギター中高域のポジション（5フレット〜17フレット = MIDI 57〜84）
         const SAFE_MIN = 57; 
         const SAFE_MAX = 84;
 
-        let curMidi = 65; // F4
+        let lastPitch = -1; // 同音連続を防ぐためのトラッカー
 
         for (let m = 0; m < measureCount; m++) {
           const chordStr = chords[m] || "Cmaj7";
@@ -421,63 +421,75 @@
           displayMelody += `"${firstChord}"`;
           audioMelody += `"${firstChord}"`;
 
-          // ★伴奏はピアノのみ（ベース廃止）
+          // ピアノ伴奏のみ
           compingStr += getPianoCompingAbc(firstChord, keySig, accV2) + " | ";
 
           const pattern = m % 4;
 
-          const formatNote = (midi, duration = "") => {
-            let safeMidi = midi;
-            // 開放弦ピッチ(40,45,50,55,59,64)を避ける安全シフト
-            while (safeMidi > SAFE_MAX) safeMidi -= 12;
-            while (safeMidi < SAFE_MIN) safeMidi += 12;
-            if ([59, 64].includes(safeMidi)) safeMidi += (Math.random() < 0.5 ? 1 : -1);
+          // 音符フォーマッター（同音連続と開放弦ピッチを完全排除）
+          const formatNote = (targetMidi, duration = "") => {
+            let p = targetMidi;
 
-            const abc = midiToAbcByKey(safeMidi, keySig, accV1);
-            const degree = showDegrees ? getAccurateDegreeLabel(safeMidi, firstChord) : "";
-            // 度数は音符の直下に注記してコードネームとの重なりを防止
+            // 1. 音域内にクリップ
+            while (p > SAFE_MAX) p -= 12;
+            while (p < SAFE_MIN) p += 12;
+
+            // 2. 開放弦ピッチ（40, 45, 50, 55, 59, 64）の物理的除外
+            if (GUITAR_OPEN_PITCHES.includes(p)) {
+              p += (p < SAFE_MAX ? 1 : -1);
+            }
+
+            // 3. ★同音連続の絶対禁止（直前の音と同じならステップ移動）
+            if (p === lastPitch) {
+              p += (p + 2 <= SAFE_MAX ? 2 : -2);
+              if (GUITAR_OPEN_PITCHES.includes(p)) p += 1;
+            }
+
+            lastPitch = p;
+
+            const abc = midiToAbcByKey(p, keySig, accV1);
+            const degree = showDegrees ? getAccurateDegreeLabel(p, firstChord) : "";
             const annot = degree ? `_"${degree}"` : "";
+
             return { display: `${annot}${abc}${duration}`, audio: `${abc}${duration}` };
           };
 
           if (pattern === 0) {
-            // 【弦移動アルペジオ（ハイポジション・開放弦なし）】
-            let baseP = 60 + rootMidi;
-            while (baseP < SAFE_MIN) baseP += 12;
-            while (baseP > 68) baseP -= 12;
+            // 【アルペジオ上昇＆スケール下降】
+            let start = 58 + rootMidi;
+            while (start < SAFE_MIN) start += 12;
+            while (start > 68) start -= 12;
 
-            let n1 = formatNote(baseP);
-            let n2 = formatNote(baseP + 4);
-            let n3 = formatNote(baseP + 7);
-            let n4 = formatNote(baseP + 10);
-            let n5 = formatNote(baseP + 14);
-            let n6 = formatNote(baseP + 12);
-            let n7 = formatNote(baseP + 9);
-            let n8 = formatNote(baseP + 7);
+            let n1 = formatNote(start);
+            let n2 = formatNote(start + 4);
+            let n3 = formatNote(start + 7);
+            let n4 = formatNote(start + 11);
+            let n5 = formatNote(start + 14);
+            let n6 = formatNote(start + 12);
+            let n7 = formatNote(start + 9);
+            let n8 = formatNote(start + 7);
 
             displayMelody += `${n1.display}${n2.display} ${n3.display}${n4.display} ${n5.display}${n6.display} ${n7.display}${n8.display} | `;
             audioMelody += `${n1.audio}${n2.audio} ${n3.audio}${n4.audio} ${n5.audio}${n6.audio} ${n7.audio}${n8.audio} | `;
-            curMidi = baseP + 7;
 
           } else if (pattern === 1) {
-            // 【ビバップ・ターン3連符 & スケール下降】
-            const target = curMidi;
-            const t1 = formatNote(target + 1);
-            const t2 = formatNote(target);
-            const t3 = formatNote(target - 1);
+            // 【ビバップ・ターン3連符 & 流れるスケール下降】
+            let center = lastPitch > 0 ? lastPitch : 67;
+            const t1 = formatNote(center + 1);
+            const t2 = formatNote(center);
+            const t3 = formatNote(center - 1);
 
             displayMelody += `(3${t1.display}${t2.display}${t3.display} `;
             audioMelody += `(3${t1.audio}${t2.audio}${t3.audio} `;
 
-            let d1 = formatNote(target - 2);
-            let d2 = formatNote(target - 4);
-            let d3 = formatNote(target - 5);
-            let d4 = formatNote(target - 7);
-            let d5 = formatNote(target - 9);
+            let d1 = formatNote(center - 2);
+            let d2 = formatNote(center - 4);
+            let d3 = formatNote(center - 5);
+            let d4 = formatNote(center - 7);
+            let d5 = formatNote(center - 9);
 
             displayMelody += `${d1.display}${d2.display} ${d3.display}${d4.display} ${d5.display}z | `;
             audioMelody += `${d1.audio}${d2.audio} ${d3.audio}${d4.audio} ${d5.audio}z | `;
-            curMidi = target - 9;
 
           } else if (pattern === 2) {
             // 【V7オルタード解決（b9, #9, 3rd着地）】
@@ -489,27 +501,28 @@
               const n2 = formatNote(tension - 1);
               const n3 = formatNote(third + 1);
               const n4 = formatNote(third - 1);
-              const n5 = formatNote(third, "2");
+              const n5 = formatNote(third, "2"); // 4分音符で着地
 
               displayMelody += `${n1.display}${n2.display} ${n3.display}${n4.display} ${n5.display} z2 | `;
               audioMelody += `${n1.audio}${n2.audio} ${n3.audio}${n4.audio} ${n5.audio} z2 | `;
-              curMidi = third;
             } else {
-              const n1 = formatNote(curMidi, "2");
-              const t1 = formatNote(curMidi + 3);
-              const t2 = formatNote(curMidi + 5);
-              const t3 = formatNote(curMidi + 7);
-              const n2 = formatNote(curMidi + 10, "2");
+              let c = lastPitch > 0 ? lastPitch : 62;
+              const n1 = formatNote(c, "2");
+              const t1 = formatNote(c + 3);
+              const t2 = formatNote(c + 5);
+              const t3 = formatNote(c + 7);
+              const n2 = formatNote(c + 10, "2");
 
               displayMelody += `${n1.display} (3${t1.display}${t2.display}${t3.display} ${n2.display} | `;
               audioMelody += `${n1.audio} (3${t1.audio}${t2.audio}${t3.audio} ${n2.audio} | `;
-              curMidi = curMidi + 10;
             }
 
           } else {
-            // 【跳躍 & 3連クロマチック】
-            let jump = curMidi < 70 ? curMidi + 12 : curMidi - 12;
-            const n1 = formatNote(curMidi);
+            // 【跳躍インターバル & 3連クロマチック】
+            let base = lastPitch > 0 ? lastPitch : 63;
+            let jump = base < 70 ? base + 11 : base - 11;
+
+            const n1 = formatNote(base);
             const n2 = formatNote(jump);
             const c1 = formatNote(jump - 1);
             const c2 = formatNote(jump - 2);
@@ -518,7 +531,6 @@
 
             displayMelody += `${n1.display}${n2.display} (3${c1.display}${c2.display}${c3.display} ${n3.display} z | `;
             audioMelody += `${n1.audio}${n2.audio} (3${c1.audio}${c2.audio}${c3.audio} ${n3.audio} z | `;
-            curMidi = jump - 5;
           }
 
           if ((m + 1) % 4 === 0) {
@@ -528,7 +540,6 @@
           }
         }
 
-        // ABC譜面ヘッダー
         let header = "X: 1\n";
         header += `T: ${currentSong.title || "Jazz Solo Etude"}\n`;
         header += "M: 4/4\n";
@@ -540,15 +551,14 @@
         header += "%%annotationfont 11\n";
         setAbcString(header + displayMelody);
 
-        // オーディオ（ピアノ伴奏のみ・ベース音色撤廃）
         let audioH = "X: 1\n";
         audioH += "M: 4/4\n";
         audioH += "L: 1/8\n";
         audioH += `Q: 1/4=${bpm}\n`;
         audioH += `K: ${keySig}\n`;
         audioH += "%%staves (1 2)\n";
-        audioH += "V: 1 clef=treble\n%%MIDI program 26\n%%MIDI control 7 115\n"; // Guitar
-        audioH += "V: 2 clef=treble\n%%MIDI program 0\n%%MIDI control 7 70\n";   // Piano Only
+        audioH += "V: 1 clef=treble\n%%MIDI program 26\n%%MIDI control 7 115\n"; // Guitar Solo
+        audioH += "V: 2 clef=treble\n%%MIDI program 0\n%%MIDI control 7 70\n";   // Piano Comping Only
 
         setAudioAbcString(audioH + "[V: 1]\n" + audioMelody + "[V: 2]\n" + compingStr);
         setBackingAbcString(audioH + "[V: 1]\n%%MIDI control 7 0\n" + audioMelody + "[V: 2]\n" + compingStr);
@@ -575,7 +585,7 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Jazz Solo & TAB Etude</h1>
-                  <p className="text-xs text-slate-500">ピアノ伴奏のみ・調号完全準拠（二重♭なし）・開放弦ゼロ</p>
+                  <p className="text-xs text-slate-500">同音連続禁止・開放弦ゼロ保証・ピアノ伴奏のみ</p>
                 </div>
               </div>
 
