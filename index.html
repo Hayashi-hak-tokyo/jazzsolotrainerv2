@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Giants Ultimate Lick & Perfect TAB Etude</title>
+  <title>Jazz Giants Solo & Voice Leading Etude</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -25,14 +25,9 @@
     .abcjs-highlight { fill: #2563eb !important; stroke: #2563eb !important; }
     .abcjs-tempo { display: none !important; }
 
-    /* コードネームと度数（w:）のスタイル */
     .abcjs-chord { font-size: 15px !important; font-weight: 800 !important; fill: #0f172a !important; }
     .abcjs-lyric { font-size: 11px !important; font-weight: 700 !important; fill: #b45309 !important; font-family: sans-serif !important; }
 
-    /* TAB譜スタイル */
-    .abcjs-tablature line { stroke: #cbd5e1; }
-    .abcjs-tablature text { fill: #0f172a; font-weight: bold; font-family: monospace; font-size: 13px; }
-    
     #paper { padding-bottom: 20px; }
     #paper svg { 
       overflow: visible !important; 
@@ -60,7 +55,6 @@
     .abcjs-inline-audio .abcjs-btn:hover { background-color: #e2e8f0 !important; }
     .abcjs-inline-audio .abcjs-btn svg { width: 18px !important; height: 18px !important; fill: #334155 !important; }
 
-    /* ループ再生ボタンON時の明確な青色ハイライト */
     .abcjs-inline-audio .abcjs-btn.abcjs-pushed {
        background-color: #2563eb !important;
        border-color: #1d4ed8 !important;
@@ -79,7 +73,7 @@
     const standardSongs = [
       {
         title: "Autumn Leaves",
-        key: "Gm", // 調号: Bb, Eb
+        key: "Gm",
         measures: 32,
         chords: [
           "Cm7", "F7", "Bbmaj7", "Ebmaj7", "Am7b5", "D7", "Gm7", "Gm7",
@@ -90,7 +84,7 @@
       },
       {
         title: "Blue Bossa",
-        key: "Cm", // 調号: Bb, Eb, Ab
+        key: "Cm",
         measures: 16,
         chords: [
           "Cm7", "Cm7", "Fm7", "Fm7", "Dm7b5", "G7", "Cm7", "Cm7",
@@ -99,7 +93,7 @@
       },
       {
         title: "St. Thomas",
-        key: "C", // 調号なし
+        key: "C",
         measures: 16,
         chords: [
           "Cmaj7", "Em7b5 A7", "Dm7", "G7", "Cmaj7", "Em7b5 A7", "Dm7", "G7",
@@ -108,7 +102,7 @@
       },
       {
         title: "Giant Steps",
-        key: "C", // 臨時記号で正確に表記するため調号Cを使用
+        key: "C",
         measures: 16,
         chords: [
           "Bmaj7 D7", "Gmaj7 Bb7", "Ebmaj7", "Am7 D7",
@@ -136,96 +130,72 @@
     };
 
     // ============================================================================
-    // ★ジャズ・ジャイアンツのフレーズ辞書 大増量（前半：1〜2拍目）
+    // ★ ジャズ・ジャイアンツのフレーズ辞書 (前半: 1〜2拍目)
     // ============================================================================
     const JAZZ_GIANT_HALF_CELLS_BEAT12 = [
-      { artist: "Charlie Parker", pattern: "z_8_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
-      { artist: "Wes Montgomery", pattern: "88_trip", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:2,oct:0}] },
-      { artist: "Sonny Rollins", pattern: "4_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
-      { artist: "John Coltrane", pattern: "88_88", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
-      { artist: "Clifford Brown", pattern: "88_88", notes: [{degIdx:3,oct:1},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0}] },
-      { artist: "Grant Green", pattern: "8z_z8", notes: [{degIdx:2,oct:0},{degIdx:3,oct:0}] },
-      // 追加のコードトーン順列バリエーション
+      { artist: "Charlie Parker (Offbeat)", pattern: "z_8_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
+      { artist: "Wes Montgomery (Turn)", pattern: "88_trip", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:2,oct:0}] },
+      { artist: "John Coltrane (1357)", pattern: "88_88", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
+      { artist: "Clifford Brown (Drop)", pattern: "88_88", notes: [{degIdx:3,oct:1},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0}] },
       { artist: "Joe Pass (1-5-3-7)", pattern: "88_88", notes: [{degIdx:0,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:3,oct:0}] },
       { artist: "Thelonious Monk (1-7-3-5)", pattern: "88_88", notes: [{degIdx:0,oct:0},{degIdx:3,oct:-1},{degIdx:1,oct:0},{degIdx:2,oct:0}] },
-      { artist: "Pat Metheny (3-5-7-1)", pattern: "88_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:0,oct:1}] },
-      { artist: "Miles Davis (Space 3-5)", pattern: "4_4", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0}] },
-      { artist: "Charlie Christian (5-1-3-5)", pattern: "88_88", notes: [{degIdx:2,oct:-1},{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0}] },
-      { artist: "Bill Evans (Sync 7-3-5)", pattern: "z8_88", notes: [{degIdx:3,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0}] },
-      { artist: "Dexter Gordon (3-1-7-5)", pattern: "88_88", notes: [{degIdx:1,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1},{degIdx:2,oct:-1}] },
-      { artist: "Lee Morgan (Trumpet Triplet)", pattern: "trip_88", notes: [{degIdx:0,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1}] },
-      { artist: "Jim Hall (1 & 7)", pattern: "4_4", notes: [{degIdx:0,oct:0},{degIdx:3,oct:-1}] },
-      { artist: "Double Triplet Cascade", pattern: "trip_trip", notes: [{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1},{degIdx:2,oct:-1},{degIdx:1,oct:-1}] }
+      
+      // ★ Lage Lund / Tim Miller 風のオープントライアド（スプレッド・ヴォイシング）
+      { artist: "Lage Lund (Open Triad 1-5-10)", pattern: "88_88", notes: [{degIdx:0,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:1},{degIdx:0,oct:1}] },
+      { artist: "Tim Miller (Wide Spread 3-R-7-5)", pattern: "88_88", notes: [{degIdx:1,oct:0},{degIdx:0,oct:1},{degIdx:3,oct:0},{degIdx:2,oct:1}] },
+      { artist: "Modern Spread (5-1-7)", pattern: "z8_88", notes: [{degIdx:2,oct:-1},{degIdx:0,oct:0},{degIdx:3,oct:0}] },
+      { artist: "Jonathan Kreisberg (Tri Drop)", pattern: "88_88", notes: [{degIdx:1,oct:1},{degIdx:2,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1}] },
+
+      // 3rdから始まる専用セル（ボイスリーディング着地用）
+      { artist: "Start 3rd Ascend", pattern: "88_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:0,oct:1}] },
+      { artist: "Start 3rd Descend", pattern: "88_88", notes: [{degIdx:1,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1},{degIdx:2,oct:-1}] },
+      { artist: "Start 3rd Triplet", pattern: "trip_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1}] }
     ];
 
     // ============================================================================
-    // ★ジャズ・ジャイアンツのフレーズ辞書 大増量（後半：3〜4拍目 / Over-the-Barline）
+    // ★ ジャズ・ジャイアンツのフレーズ辞書 (後半: 3〜4拍目 / Over-the-Barline)
     // ============================================================================
     const JAZZ_GIANT_HALF_CELLS_BEAT34 = [
-      { artist: "Charlie Parker", pattern: "trip_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1}] },
-      { artist: "Sonny Stitt", pattern: "z8_88", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0}] },
-      { artist: "Kenny Burrell", pattern: "88_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:0,oct:1}] },
-      { artist: "Dizzy Gillespie", pattern: "88_trip", notes: [{degIdx:3,oct:0},{degIdx:2,oct:0},{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0}] },
-      { artist: "Jim Hall", pattern: "4_88", notes: [{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:3,oct:0}] },
-      // 追加の順列・解決アプローチ
-      { artist: "Paul Chambers (1-3-5-7 Walk)", pattern: "88_88", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
-      { artist: "Wayne Shorter (7-5-3-1 Pivot)", pattern: "88_88", notes: [{degIdx:3,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0}] },
-      { artist: "Chet Baker (Lyrical 3-5-7)", pattern: "88_4", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
-      { artist: "Gerry Mulligan (1-7-5-3 Jump)", pattern: "88_88", notes: [{degIdx:0,oct:0},{degIdx:3,oct:-1},{degIdx:2,oct:-1},{degIdx:1,oct:-1}] },
-      { artist: "Stan Getz (Triplet Wrap)", pattern: "88_trip", notes: [{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:0,oct:1},{degIdx:1,oct:1},{degIdx:2,oct:1}] },
-      { artist: "Freddie Hubbard (7-1-3-5 Lift)", pattern: "88_88", notes: [{degIdx:3,oct:-1},{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0}] },
-      { artist: "Art Pepper (Sync 5-3-1)", pattern: "z8_88", notes: [{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0}] },
-      { artist: "Red Garland (Block Chord)", pattern: "trip_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:0,oct:1},{degIdx:1,oct:1}] },
-      { artist: "Syncopated Leap (1-7)", pattern: "8z_z8", notes: [{degIdx:0,oct:0},{degIdx:3,oct:0}] },
-      { artist: "Double Triplet Drive", pattern: "trip_trip", notes: [{degIdx:3,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:0,oct:1}] }
+      { artist: "Charlie Parker (Barline)", pattern: "trip_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1}] },
+      { artist: "Sonny Stitt (Drive)", pattern: "z8_88", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0}] },
+      { artist: "Kenny Burrell (Swing)", pattern: "88_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:0,oct:1}] },
+      { artist: "Dizzy Gillespie (Rocket)", pattern: "88_trip", notes: [{degIdx:3,oct:0},{degIdx:2,oct:0},{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0}] },
+      { artist: "Wayne Shorter (7-5-3-1)", pattern: "88_88", notes: [{degIdx:3,oct:0},{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0}] },
+      
+      // 7thで終わる専用セル（ボイスリーディング解決準備用）
+      { artist: "Guide Tone Target (to 7th)", pattern: "88_88", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
+      { artist: "Barry Harris (Descend 7)", pattern: "88_88", notes: [{degIdx:2,oct:0},{degIdx:1,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1}] },
+      { artist: "Pivot Target 7th", pattern: "88_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:0,oct:0},{degIdx:3,oct:-1}] },
+      { artist: "Triplet Drop 7th", pattern: "trip_88", notes: [{degIdx:0,oct:0},{degIdx:2,oct:-1},{degIdx:1,oct:-1},{degIdx:0,oct:-1},{degIdx:3,oct:-2}] }
     ];
 
     // ============================================================================
-    // ★V7専用：インサイド（Chordtone）アプローチのバリエーション
+    // ★ V7専用 アプローチセル群
     // ============================================================================
     const V7_CHORDTONE_CELLS = [
-      { pattern: "88_88", intervals: [0, 4, 7, 10] },      // R, 3, 5, b7
-      { pattern: "88_88", intervals: [10, 7, 4, 0] },      // b7, 5, 3, R
-      { pattern: "88_88", intervals: [4, 7, 10, 12] },     // 3, 5, b7, R(oct)
-      { pattern: "88_88", intervals: [7, 10, 12, 16] },    // 5, b7, R, 3(oct)
-      { pattern: "88_88", intervals: [12, 10, 7, 4] },     // R(oct), b7, 5, 3
-      { pattern: "88_88", intervals: [4, 10, 7, 12] },     // 3, b7, 5, R(oct)
-      { pattern: "trip_88", intervals: [4, 7, 10, 12, 16] },// (3,5,b7), R, 3
-      { pattern: "z8_88", intervals: [10, 12, 16] },       // z, b7, R, 3
-      { pattern: "4_88", intervals: [4, 10, 7] },          // 3(4分), b7, 5
-      { pattern: "88_4", intervals: [10, 7, 4] }           // b7, 5, 3(4分)
+      { pattern: "88_88", intervals: [0, 4, 7, 10] }, // R, 3, 5, b7
+      { pattern: "88_88", intervals: [10, 7, 4, 0] }, // b7, 5, 3, R
+      { pattern: "88_88", intervals: [4, 7, 12, 10] }, // 3, 5, R(oct), b7  (Ends on 7th)
+      { pattern: "88_88", intervals: [7, 10, 12, 16] },// 5, b7, R, 3(oct)
+      { pattern: "trip_88", intervals: [4, 7, 10, 12, 10] }, // 3,5,b7 -> R -> b7 (Ends on 7th)
+      { pattern: "z8_88", intervals: [10, 12, 16] }   // z, b7, R, 3
     ];
 
-    // ============================================================================
-    // ★V7専用：オルタード・テンションアプローチ
-    // ============================================================================
     const V7_ALTERED_CELLS = [
-      { pattern: "88_88", intervals: [8, 3, 1, 4] },       // b13, #9, b9, 3 (Bird)
-      { pattern: "trip_88", intervals: [3, 1, 0, -2, 4] }, // (#9,b9,R), b7, 3 (Coltrane)
-      { pattern: "z8_88", intervals: [6, 8, 3] },          // z, #11, b13, #9 (Wes)
-      { pattern: "88_88", intervals: [4, 6, 8, 10] },      // 3, #11, b13, b7 (Whole Tone)
-      { pattern: "88_88", intervals: [1, 4, 8, 12] },      // b9, 3, b13, R(oct)
-      { pattern: "88_88", intervals: [3, 4, 6, 8] },       // #9, 3, #11, b13
-      { pattern: "88_88", intervals: [10, 8, 6, 4] },      // b7, b13, #11, 3
-      { pattern: "4_4", intervals: [8, 3] },               // b13(4分), #9(4分)
-      { pattern: "trip_trip", intervals: [8, 6, 4, 3, 1, 0] },// (b13,#11,3), (#9,b9,R)
-      { pattern: "4_88", intervals: [1, 3, 4] }            // b9(4分), #9, 3
+      { pattern: "88_88", intervals: [8, 3, 1, 4] },  // b13, #9, b9, 3 (Bird)
+      { pattern: "trip_88", intervals: [3, 1, 0, -2, 4] }, // (#9,b9,R), b7, 3
+      { pattern: "z8_88", intervals: [6, 8, 3] },     // z, #11, b13, #9 (Wes)
+      { pattern: "88_88", intervals: [4, 6, 8, 10] }, // 3, #11, b13, b7 (Ends on 7th)
+      { pattern: "88_88", intervals: [1, 3, 8, 10] }, // b9, #9, b13, b7 (Ends on 7th)
+      { pattern: "trip_88", intervals: [4, 1, 0, 8, 10] } // 3, b9, R -> b13, b7 (Ends on 7th)
     ];
 
-    // ============================================================================
-    // ★V7専用：コンディミ・テンションアプローチ
-    // ============================================================================
     const V7_CONDIM_CELLS = [
-      { pattern: "88_88", intervals: [9, 6, 7, 4] },       // 13, #11, 5, 3 (Dim Sweep)
-      { pattern: "88_88", intervals: [1, 3, 4, 6] },       // b9, #9, 3, #11
-      { pattern: "88_88", intervals: [7, 9, 10, 13] },     // 5, 13, b7, b9(oct)
-      { pattern: "trip_88", intervals: [3, 0, -2, -5, -2] },// (#9,R,b7), 5, b7
-      { pattern: "88_88", intervals: [9, 10, 13, 16] },    // 13, b7, b9(oct), 3(oct)
-      { pattern: "88_88", intervals: [6, 7, 4, 1] },       // #11, 5, 3, b9
-      { pattern: "88_88", intervals: [10, 9, 7, 6] },      // b7, 13, 5, #11
-      { pattern: "4_4", intervals: [9, 3] },               // 13(4分), #9(4分)
-      { pattern: "88_trip", intervals: [1, 3, 4, 6, 7] },  // b9, #9, (3,#11,5)
-      { pattern: "z_8_88", intervals: [6, 7, 9] }          // z, #11, 5, 13
+      { pattern: "88_88", intervals: [9, 6, 7, 4] },  // 13, #11, 5, 3
+      { pattern: "88_88", intervals: [1, 3, 4, 6] },  // b9, #9, 3, #11
+      { pattern: "88_88", intervals: [7, 9, 13, 10] },// 5, 13, b9(oct), b7 (Ends on 7th)
+      { pattern: "88_88", intervals: [6, 7, 9, 10] }, // #11, 5, 13, b7 (Ends on 7th)
+      { pattern: "trip_88", intervals: [3, 0, -2, -5, -2] } // (#9,R,b7), 5, b7
     ];
 
     function App() {
@@ -234,7 +204,7 @@
       const [chords, setChords] = useState(Array(64).fill(""));
       const [currentSong, setCurrentSong] = useState(standardSongs[0]);
       const [v7Approach, setV7Approach] = useState("chordtone");
-      const [tabView, setTabView] = useState("guitar"); // guitar, bass, none
+      const [tabView, setTabView] = useState("guitar"); 
       const [showDegrees, setShowDegrees] = useState(true);
       
       const [abcString, setAbcString] = useState("");
@@ -276,7 +246,7 @@
         }
       }, [abcjsLoaded, chords]);
 
-      // レンダリングと「開放弦ゼロ運指マッピング ＆ ベース4本線化」の適用
+      // レンダリングと「開放弦ゼロ運指 ＆ ベース4本線化」の適用
       useEffect(() => {
         if (abcjsLoaded && abcString && window.ABCJS) {
           let tablatureOptions = [];
@@ -288,10 +258,11 @@
               tuning: ['E,', 'A,', 'D', 'G', 'B', 'e']
             }];
           } else if (tabView === 'bass') {
+            // ベースもABCJSエンジン上はギターとして出力させ、後から不要な線を消す
             tablatureOptions = [{
               instrument: 'guitar',
               label: 'TAB (Bass 8vb)',
-              tuning: ['E,', 'A,', 'D', 'G', 'B', 'e']
+              tuning: ['E,', 'A,', 'D', 'G', 'B', 'e'] 
             }];
           }
 
@@ -306,6 +277,7 @@
             tablature: tablatureOptions
           });
 
+          // SVG描画直後に完全なTAB数字とY座標へ置換
           if (tabView !== 'none' && tabNotesData.length > 0) {
             applyAccurateTabToSvg(tabView === 'bass', tabNotesData);
           }
@@ -337,7 +309,7 @@
 
                 if (ev.elements && Array.isArray(ev.elements)) {
                   const audioNotes = Array.from(audioSvg.querySelectorAll(".abcjs-v0 .abcjs-note, .abcjs-v0 .abcjs-rest"));
-                  const displayNotes = Array.from(displaySvg.querySelectorAll(".abcjs-note"));
+                  const displayNotes = Array.from(displaySvg.querySelectorAll(".abcjs-note, .abcjs-rest"));
 
                   ev.elements.forEach(element => {
                     if (!element) return;
@@ -373,7 +345,7 @@
         }
       }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsLoaded, tabView, showDegrees, tabNotesData]);
 
-      // クラス名に依存せず、SVG座標から100%確実に「開放弦ゼロ運指」と「4本線ベースTAB」を適用する関数
+      // SVG上のTAB座標とテキストを、計算済みの「開放弦ゼロ運指」へ上書きする
       const applyAccurateTabToSvg = (isBass, notesList) => {
         const svg = document.querySelector("#paper svg");
         if (!svg) return;
@@ -383,7 +355,9 @@
           try {
             const box = el.getBBox();
             return box.width > 300 && box.height < 2.5;
-          } catch (e) { return false; }
+          } catch (e) {
+            return false;
+          }
         });
 
         horizontalLines.sort((a, b) => a.getBBox().y - b.getBBox().y);
@@ -425,7 +399,9 @@
               const box = txt.getBBox();
               const cy = box.y + box.height / 2;
               return cy >= yTop - 10 && cy <= yBot + 10 && box.x > lineBounds.x + 25;
-            } catch (e) { return false; }
+            } catch (e) {
+              return false;
+            }
           });
 
           tabNumberTexts.sort((a, b) => a.getBBox().x - b.getBBox().x);
@@ -467,7 +443,7 @@
             }
           });
 
-          // ベースTAB選択時：下2本線（5弦・6弦）を消し、縦線とTABロゴを1〜4弦の高さに美しく整形
+          // ★ ベースTABの4本線化整形
           if (isBass) {
             tabLines[4].style.display = "none";
             tabLines[5].style.display = "none";
@@ -477,6 +453,7 @@
               if (tabLines.includes(el)) return;
               try {
                 const box = el.getBBox();
+                // 縦線
                 if (box.width < 6 && box.height > 20 && Math.abs(box.y - yTop) < 8) {
                   el.style.display = "none";
                   const newBar = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -488,6 +465,7 @@
                   newBar.setAttribute("stroke-width", box.width > 2 ? "2" : "1.2");
                   svg.appendChild(newBar);
                 }
+                // TABロゴ縮小
                 else if (box.x < lineBounds.x + 30 && box.width < 30 && box.y >= yTop - 5 && box.y + box.height > yFourth + 3) {
                   const scale = (yFourth - yTop) / (yBot - yTop);
                   el.setAttribute("transform", `translate(0, ${yTop * (1 - scale)}) scale(1, ${scale})`);
@@ -510,18 +488,16 @@
         });
       };
 
-      // ★開放弦（0フレット）を100%排除し、6〜20Fのボックスポジションを選ぶギター運指計算
+      // ギター運指計算 (6〜20Fボックス)
       const calcBestGuitarTab = (midi, prevFretRef) => {
         const openPitches = [64, 59, 55, 50, 45, 40];
         let candidates = [];
 
         for (let s = 0; s < 6; s++) {
           const fret = midi - openPitches[s];
-          // ★ フレット6以上を強制し、開放弦とローフレットを排除！
           if (fret >= 6 && fret <= 20) {
             const distFromPrev = Math.abs(fret - prevFretRef.current);
-            const score = distFromPrev;
-            candidates.push({ string: s + 1, fret, score });
+            candidates.push({ string: s + 1, fret, score: distFromPrev });
           }
         }
 
@@ -534,7 +510,7 @@
         return { string: 6, fret: Math.max(6, midi - 40) };
       };
 
-      // ★開放弦（0フレット）を100%排除し、4弦ベースの2〜12Fボックスに収めるベース運指計算
+      // ベース運指計算 (2〜12Fボックス)
       const calcBestBassTab = (midi, prevFretRef) => {
         let bassMidi = midi - 12;
         while (bassMidi > 55) bassMidi -= 12;
@@ -545,11 +521,9 @@
 
         for (let s = 0; s < 4; s++) {
           const fret = bassMidi - openPitches[s];
-          // ★ fret >= 2 により開放弦（0フレット）を100%除外！
           if (fret >= 2 && fret <= 12) {
             const distFromPrev = Math.abs(fret - prevFretRef.current);
-            const score = distFromPrev;
-            candidates.push({ string: s + 1, fret, score });
+            candidates.push({ string: s + 1, fret, score: distFromPrev });
           }
         }
 
@@ -663,6 +637,9 @@
         return `[${r}${t}${s}]${beats}`;
       };
 
+      // ============================================================================
+      // ★ 4度進行・ボイスリーディング・モダンセル生成エンジン
+      // ============================================================================
       const generateEtude = () => {
         let fullLines = [];
         let audioMelody = "";
@@ -678,7 +655,52 @@
         const prevGuitarFretRef = { current: 7 };
         const prevBassFretRef = { current: 5 };
 
-        const processNote = (actualSemi, chordInfo, accRef, degreeTokensOut) => {
+        // 1. コード進行を2拍ごとの「ハーフ小節」リストに展開し、4度進行を解析
+        let execPlan = [];
+        for (let m = 0; m < measureCount; m++) {
+          const chordRaw = chords[m] || "Cmaj7";
+          const chordList = chordRaw.split(/\s+/).filter(c => c.length > 0);
+          const chord1 = chordList[0] || "Cmaj7";
+          const chord2 = chordList.length >= 2 ? chordList[1] : chord1;
+
+          execPlan.push({ measure: m, half: 1, chordStr: chord1, forceEnd7th: false, forceStart3rd: false });
+          execPlan.push({ measure: m, half: 2, chordStr: chord2, forceEnd7th: false, forceStart3rd: false });
+        }
+
+        // 4度進行チェック (7th -> 3rd解決を60%で発生させる)
+        for (let i = 0; i < execPlan.length - 1; i++) {
+          const currInfo = getChordToneInfo(execPlan[i].chordStr);
+          const nextInfo = getChordToneInfo(execPlan[i+1].chordStr);
+          const interval = (nextInfo.rootPitch - currInfo.rootPitch + 12) % 12;
+
+          // 完全4度上 (Dm7 -> G7 等)
+          if (interval === 5) {
+            if (Math.random() < 0.60) {
+              execPlan[i].forceEnd7th = true;
+              execPlan[i+1].forceStart3rd = true;
+            }
+          }
+        }
+
+        const realizeGiantCell = (cellList, chordInfo, accRef, degreeTokensOut, requireStart3rd, requireEnd7th) => {
+          // 条件に合うセルをフィルタリング
+          let validCells = cellList;
+          
+          if (requireStart3rd) {
+            const filtered = validCells.filter(c => c.notes && c.notes[0].degIdx === 1); // 3rd始まり
+            if (filtered.length > 0) validCells = filtered;
+          }
+          if (requireEnd7th) {
+            const filtered = validCells.filter(c => {
+              if (c.notes) return c.notes[c.notes.length - 1].degIdx === 3; // 7th終わり
+              if (c.intervals) return c.intervals[c.intervals.length - 1] === 10 || c.intervals[c.intervals.length - 1] === 11; // b7 or △7
+              return false;
+            });
+            if (filtered.length > 0) validCells = filtered;
+          }
+
+          const cell = validCells[Math.floor(Math.random() * validCells.length)];
+          
           let bestBaseOctave = tabView === 'bass' ? 48 : 60;
           let minDistance = 999;
           for (let octBase of (tabView === 'bass' ? [36, 48] : [48, 60, 72])) {
@@ -690,41 +712,38 @@
             }
           }
 
-          let p = bestBaseOctave + chordInfo.rootPitch + actualSemi;
-          while (p < SAFE_MIN) p += 12;
-          while (p > SAFE_MAX) p -= 12;
-
-          if (p === prevPitch) {
-            p = (p + 12 <= SAFE_MAX) ? p + 12 : (p - 12 >= SAFE_MIN ? p - 12 : p);
-          }
-
-          prevPitch = p;
-          const abc = midiToAbcByKey(p, keySig, accRef);
-          const deg = getExactDegree(p % 12, chordInfo.rootPitch, chordInfo.isV7);
-          degreeTokensOut.push(deg || "·");
-
-          allTabNotes.push({
-            midi: p,
-            guitar: calcBestGuitarTab(p, prevGuitarFretRef),
-            bass: calcBestBassTab(p, prevBassFretRef)
-          });
-
-          return abc;
-        };
-
-        const realizeGiantCell = (cell, chordInfo, accRef, degreeTokensOut) => {
           let abcTokens = [];
+
+          const appendNote = (semiOffset) => {
+            let p = bestBaseOctave + chordInfo.rootPitch + semiOffset;
+            while (p < SAFE_MIN) p += 12;
+            while (p > SAFE_MAX) p -= 12;
+            
+            if (p === prevPitch) p = (p + 12 <= SAFE_MAX) ? p + 12 : (p - 12 >= SAFE_MIN ? p - 12 : p);
+            
+            prevPitch = p;
+            const abc = midiToAbcByKey(p, keySig, accRef);
+            const deg = getExactDegree(p % 12, chordInfo.rootPitch, chordInfo.isV7);
+            degreeTokensOut.push(deg || "·");
+            
+            allTabNotes.push({
+              midi: p,
+              guitar: calcBestGuitarTab(p, prevGuitarFretRef),
+              bass: calcBestBassTab(p, prevBassFretRef)
+            });
+            return abc;
+          };
 
           if (cell.intervals) {
             cell.intervals.forEach(semi => {
               let actualSemi = semi;
               if (v7Approach === 'condim' && semi === 8) actualSemi = 9;
-              abcTokens.push(processNote(actualSemi, chordInfo, accRef, degreeTokensOut));
+              abcTokens.push(appendNote(actualSemi));
             });
           } else {
             cell.notes.forEach(nSpec => {
               const semi = chordInfo.basicOffsets[nSpec.degIdx] + (nSpec.oct * 12);
-              abcTokens.push(processNote(semi, chordInfo, accRef, degreeTokensOut));
+              abcTokens.push(appendNote(semi));
             });
           }
 
@@ -742,60 +761,45 @@
           }
         };
 
-        for (let m = 0; m < measureCount; m++) {
-          const chordRaw = chords[m] || "Cmaj7";
-          const chordList = chordRaw.split(/\s+/).filter(c => c.length > 0);
-          const hasTwoChords = chordList.length >= 2;
-          const chord1 = chordList[0] || "Cmaj7";
-          const chord2 = hasTwoChords ? chordList[1] : chord1;
+        for (let i = 0; i < execPlan.length; i += 2) {
+          const plan1 = execPlan[i];
+          const plan2 = execPlan[i+1];
 
-          const info1 = getChordToneInfo(chord1);
-          const info2 = getChordToneInfo(chord2);
+          const info1 = getChordToneInfo(plan1.chordStr);
+          const info2 = getChordToneInfo(plan2.chordStr);
 
           let accV1 = {};
           let accComp = {};
 
-          if (hasTwoChords) {
-            compingStr += `${getPianoVoicing(chord1, keySig, accComp, 4)} ${getPianoVoicing(chord2, keySig, accComp, 4)} | `;
+          if (plan1.chordStr !== plan2.chordStr) {
+            compingStr += `${getPianoVoicing(plan1.chordStr, keySig, accComp, 4)} ${getPianoVoicing(plan2.chordStr, keySig, accComp, 4)} | `;
           } else {
-            compingStr += `${getPianoVoicing(chord1, keySig, accComp, 4)} ${getPianoVoicing(chord1, keySig, accComp, 4)} | `;
+            compingStr += `${getPianoVoicing(plan1.chordStr, keySig, accComp, 4)} ${getPianoVoicing(plan1.chordStr, keySig, accComp, 4)} | `;
           }
 
           let degreeTokens = [];
-          let half1Str = `"${chord1}"`;
-          let half2Str = hasTwoChords ? `"${chord2}"` : "";
+          let half1Str = `"${plan1.chordStr}"` + realizeGiantCell(JAZZ_GIANT_HALF_CELLS_BEAT12, info1, accV1, degreeTokens, plan1.forceStart3rd, plan1.forceEnd7th) + " ";
+          
+          let half2Str = plan1.chordStr !== plan2.chordStr ? `"${plan2.chordStr}"` : "";
 
-          if (m === measureCount - 1) {
-            const endCell = JAZZ_GIANT_HALF_CELLS_BEAT34[0];
-            half1Str += realizeGiantCell(endCell, info1, accV1, degreeTokens) + " ";
-
+          // 最終小節の終わりは解決
+          if (i >= execPlan.length - 2) {
             let finalRoot = (tabView === 'bass' ? 48 : 60) + info2.rootPitch;
             if (finalRoot < SAFE_MIN) finalRoot += 12;
             const finalAbc = midiToAbcByKey(finalRoot, keySig, accV1);
             degreeTokens.push("R");
-            allTabNotes.push({
-              midi: finalRoot,
-              guitar: calcBestGuitarTab(finalRoot, prevGuitarFretRef),
-              bass: calcBestBassTab(finalRoot, prevBassFretRef)
-            });
+            allTabNotes.push({ midi: finalRoot, guitar: calcBestGuitarTab(finalRoot, prevGuitarFretRef), bass: calcBestBassTab(finalRoot, prevBassFretRef) });
             half2Str += `${finalAbc}4`;
           } else {
-            const cell1 = JAZZ_GIANT_HALF_CELLS_BEAT12[Math.floor(Math.random() * JAZZ_GIANT_HALF_CELLS_BEAT12.length)];
-            half1Str += realizeGiantCell(cell1, info1, accV1, degreeTokens) + " ";
-
-            let cell2;
+            let cell2List;
             if (info2.isV7 && v7Approach !== 'chordtone') {
-              if (v7Approach === 'altered') {
-                cell2 = V7_ALTERED_CELLS[Math.floor(Math.random() * V7_ALTERED_CELLS.length)];
-              } else {
-                cell2 = V7_CONDIM_CELLS[Math.floor(Math.random() * V7_CONDIM_CELLS.length)];
-              }
+              cell2List = v7Approach === 'altered' ? V7_ALTERED_CELLS : V7_CONDIM_CELLS;
             } else if (info2.isV7 && v7Approach === 'chordtone') {
-              cell2 = V7_CHORDTONE_CELLS[Math.floor(Math.random() * V7_CHORDTONE_CELLS.length)];
+              cell2List = V7_CHORDTONE_CELLS;
             } else {
-              cell2 = JAZZ_GIANT_HALF_CELLS_BEAT34[Math.floor(Math.random() * JAZZ_GIANT_HALF_CELLS_BEAT34.length)];
+              cell2List = JAZZ_GIANT_HALF_CELLS_BEAT34;
             }
-            half2Str += realizeGiantCell(cell2, info2, accV1, degreeTokens);
+            half2Str += realizeGiantCell(cell2List, info2, accV1, degreeTokens, plan2.forceStart3rd, plan2.forceEnd7th);
           }
 
           const measureMelodyStr = `${half1Str}${half2Str} | `;
@@ -804,7 +808,7 @@
           fullLines.push({ melody: measureMelodyStr, lyric: measureLyricStr });
           audioMelody += measureMelodyStr;
 
-          if ((m + 1) % 4 === 0) {
+          if ((i / 2 + 1) % 4 === 0) {
             audioMelody += "\n";
             compingStr += "\n";
           }
@@ -873,7 +877,7 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Jazz Giants Ultimate Lick Etude</h1>
-                  <p className="text-xs text-slate-500">6フレット以上強制アルゴリズム・純正ベース4本線・40種以上のジャイアンツ語彙</p>
+                  <p className="text-xs text-slate-500">4度進行時の7th->3rd解決 (60%)・オープントライアド・開放弦ゼロ保証</p>
                 </div>
               </div>
 
