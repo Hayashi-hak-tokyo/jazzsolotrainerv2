@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Solo Etude - Score & TAB</title>
+  <title>Jazz Solo Etude - Grand Score & TAB</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -99,7 +99,8 @@
       const [chords, setChords] = useState(Array(64).fill(""));
       const [currentSongTitle, setCurrentSongTitle] = useState("Autumn Leaves");
       const [v7Approach, setV7Approach] = useState("altered"); // chordtone, altered, condim
-      const [viewMode, setViewMode] = useState("guitar"); // score, guitar, bass
+      const [tabMode, setTabMode] = useState("guitar"); // guitar, bass, none
+      const [degreeDisplayMode, setDegreeDisplayMode] = useState("badge"); // badge, text, noteColor
       const [isBackingOnly, setIsBackingOnly] = useState(false);
       const [isPlaying, setIsPlaying] = useState(false);
       const [activeNoteId, setActiveNoteId] = useState(null);
@@ -109,7 +110,6 @@
       const audioCtxRef = useRef(null);
       const timerRef = useRef(null);
 
-      // 初期化
       useEffect(() => {
         const song = standardSongs[0];
         setMeasureCount(song.measures);
@@ -125,9 +125,9 @@
         }
       }, [chords, v7Approach]);
 
-      // 度数解析（コードトーン、テンション、アプローチ）
+      // 度数解析（重なり防止の短縮表記：R, 3, 5, 7, b9, #9, #11, b13, appr 等）
       const getDegree = (midi, chordStr) => {
-        if (!chordStr) return { label: "CT", isCT: true, isAlt: false };
+        if (!chordStr) return { shortLabel: "CT", type: "ct" };
         const match = chordStr.match(/^[A-G][#b]?/);
         const root = match ? match[0] : 'C';
         const rootMidi = PITCH_OFFSETS[root] || 0;
@@ -138,53 +138,51 @@
         const isDim = type.includes('dim') || type.includes('m7b5');
         const isV7 = type.includes('7') && !isMinor && !type.includes('maj');
 
-        if (interval === 0) return { label: "Root", isCT: true, isAlt: false };
-        if (interval === 4 && !isMinor) return { label: "3rd", isCT: true, isAlt: false };
-        if (interval === 3 && isMinor) return { label: "3rd", isCT: true, isAlt: false };
-        if (interval === 7 && !isDim) return { label: "5th", isCT: true, isAlt: false };
-        if (interval === 6 && isDim) return { label: "b5", isCT: true, isAlt: false };
-        if (interval === 10 && (isV7 || isMinor || isDim)) return { label: "7th", isCT: true, isAlt: false };
-        if (interval === 11 && !isV7 && !isMinor) return { label: "7th", isCT: true, isAlt: false };
+        if (interval === 0) return { shortLabel: "R", type: "ct" };
+        if (interval === 4 && !isMinor) return { shortLabel: "3", type: "ct" };
+        if (interval === 3 && isMinor) return { shortLabel: "♭3", type: "ct" };
+        if (interval === 7 && !isDim) return { shortLabel: "5", type: "ct" };
+        if (interval === 6 && isDim) return { shortLabel: "♭5", type: "ct" };
+        if (interval === 10 && (isV7 || isMinor || isDim)) return { shortLabel: "7", type: "ct" };
+        if (interval === 11 && !isV7 && !isMinor) return { shortLabel: "△7", type: "ct" };
 
         if (isV7) {
-          if (interval === 1) return { label: "b9", isCT: false, isAlt: true };
-          if (interval === 3) return { label: "#9", isCT: false, isAlt: true };
-          if (interval === 6) return { label: "#11", isCT: false, isAlt: true };
-          if (interval === 8) return { label: "b13", isCT: false, isAlt: true };
-          if (interval === 2) return { label: "9th", isCT: false, isAlt: false };
-          if (interval === 9) return { label: "13th", isCT: false, isAlt: false };
+          if (interval === 1) return { shortLabel: "♭9", type: "alt" };
+          if (interval === 3) return { shortLabel: "♯9", type: "alt" };
+          if (interval === 6) return { shortLabel: "♯11", type: "alt" };
+          if (interval === 8) return { shortLabel: "♭13", type: "alt" };
+          if (interval === 2) return { shortLabel: "9", type: "tension" };
+          if (interval === 9) return { shortLabel: "13", type: "tension" };
         } else {
-          if (interval === 2) return { label: "9th", isCT: false, isAlt: false };
-          if (interval === 5) return { label: "11th", isCT: false, isAlt: false };
-          if (interval === 9) return { label: "13th", isCT: false, isAlt: false };
+          if (interval === 2) return { shortLabel: "9", type: "tension" };
+          if (interval === 5) return { shortLabel: "11", type: "tension" };
+          if (interval === 9) return { shortLabel: "13", type: "tension" };
         }
 
-        return { label: "appr", isCT: false, isAlt: false };
+        return { shortLabel: "•", type: "appr" }; // 経過音・アプローチはシンプルに「•」で表現し衝突を皆無に
       };
 
-      // TABポジション算出（ギター: 6弦, ベース: 4弦 8vb下げ）
+      // TABポジション算出（ギター: 6弦, ベース: 4弦 8vb）
       const getTabPosition = (midi, isBass) => {
         if (!midi) return null;
         if (isBass) {
-          // 実音ピッチを変えずにTAB譜のみ1オクターブ下げ（8vb）で計算
-          const target = midi - 12;
-          const bassTunings = [43, 38, 33, 28]; // 1弦=G2(43), 2弦=D2(38), 3弦=A1(33), 4弦=E1(28)
+          const target = midi - 12; // 実音ピッチを変えずにTABのみ1オクターブ下 (8vb)
+          const bassTunings = [43, 38, 33, 28]; // G2, D2, A1, E1
           for (let s = 0; s < bassTunings.length; s++) {
             const fret = target - bassTunings[s];
-            if (fret >= 0 && fret <= 17) {
+            if (fret >= 0 && fret <= 18) {
               return { string: s + 1, fret };
             }
           }
           return { string: 1, fret: Math.max(0, target - 43) };
         } else {
-          // ギター: 1弦=E4(64), 2弦=B3(59), 3弦=G3(55), 4弦=D3(50), 5弦=A2(45), 6弦=E2(40)
           const guitarTunings = [64, 59, 55, 50, 45, 40];
           let best = null;
           let minDiff = 999;
           for (let s = 0; s < guitarTunings.length; s++) {
             const fret = midi - guitarTunings[s];
-            if (fret >= 0 && fret <= 20) {
-              const diff = Math.abs(fret - 7); // 5〜10フレットの中央ポジションを優先
+            if (fret >= 0 && fret <= 21) {
+              const diff = Math.abs(fret - 7);
               if (diff < minDiff) {
                 minDiff = diff;
                 best = { string: s + 1, fret };
@@ -195,7 +193,21 @@
         }
       };
 
-      // フレーズ生成（2オクターブ跳躍・意味のある3連符）
+      // 五線譜の音高Y座標計算（C4 = 60, D4, E4, F4... 幹音ステップ）
+      const getNoteStaffY = (midi) => {
+        const staffBaseY = 65; // 五線譜第1線(E4)付近
+        // 半音ではなく全音階ステップ換算
+        const midiStepMap = {
+          50: 0, 51: 0, 52: 1, 53: 2, 54: 2, 55: 3, 56: 3, 57: 4, 58: 4, 59: 5,
+          60: 6, 61: 6, 62: 7, 63: 7, 64: 8, 65: 9, 66: 9, 67: 10, 68: 10, 69: 11, 70: 11, 71: 12,
+          72: 13, 73: 13, 74: 14, 75: 14, 76: 15, 77: 16, 78: 16, 79: 17, 80: 17, 81: 18
+        };
+        const step = midiStepMap[midi] !== undefined ? midiStepMap[midi] : 6;
+        // 1ステップ = 4.5px (第1線E4 = step 8)
+        return staffBaseY - (step - 8) * 4.5;
+      };
+
+      // フレーズ生成（2オクターブ跳躍・ビバップリック・3連符）
       const generateSolo = () => {
         let measures = [];
         let noteIdCounter = 0;
@@ -216,7 +228,7 @@
           const pattern = m % 4;
 
           if (pattern === 0) {
-            // 【急上昇アルペジオ】低域から2オクターブ近く一気に駆け上がる
+            // 【急上昇アルペジオ】低域から2オクターブ駆け上がり
             let p = 50 + rootMidi;
             while (p < 52) p += 12;
             while (p > 60) p -= 12;
@@ -224,70 +236,68 @@
             for (let i = 0; i < 6; i++) {
               p += (i % 2 === 0 ? 4 : 3);
               if (p > MAX_NOTE) p -= 12;
-              notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p, dur: '8th', isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
             }
             p -= 2;
-            notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: p, dur: '8th', isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
             p -= 1;
-            notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: p, dur: '8th', isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
             curMidi = p;
 
           } else if (pattern === 1) {
             // 【ビバップ・ターン3連符 & 下降スケール】
             const target = curMidi;
-            // 3連符 (上 -> 原音 -> 下)
-            notes.push({ midi: target + 1, isTrip: true, ...getDegree(target + 1, firstChord), id: noteIdCounter++ });
-            notes.push({ midi: target, isTrip: true, ...getDegree(target, firstChord), id: noteIdCounter++ });
-            notes.push({ midi: target - 1, isTrip: true, ...getDegree(target - 1, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: target + 1, dur: 'trip', isTrip: true, ...getDegree(target + 1, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: target, dur: 'trip', isTrip: true, ...getDegree(target, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: target - 1, dur: 'trip', isTrip: true, ...getDegree(target - 1, firstChord), id: noteIdCounter++ });
 
             let p = target - 1;
             for (let i = 0; i < 5; i++) {
               p -= (i % 2 === 0 ? 2 : 1);
               if (p < MIN_NOTE) p += 12;
-              notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p, dur: '8th', isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
             }
             curMidi = p;
 
           } else if (pattern === 2) {
-            // 【V7オルタード/コンディミ解決 & エンクロージャー】
+            // 【V7オルタード／コンディミ解決 & エンクロージャー】
             if (isV7) {
-              const tension = v7Approach === 'altered' ? (60 + rootMidi + 1) : (60 + rootMidi + 3); // b9 or #9
-              notes.push({ midi: tension, isTrip: false, ...getDegree(tension, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: tension - 1, isTrip: false, ...getDegree(tension - 1, firstChord), id: noteIdCounter++ });
+              const tension = v7Approach === 'altered' ? (60 + rootMidi + 1) : (60 + rootMidi + 3);
+              notes.push({ midi: tension, dur: '8th', isTrip: false, ...getDegree(tension, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: tension - 1, dur: '8th', isTrip: false, ...getDegree(tension - 1, firstChord), id: noteIdCounter++ });
 
-              const third = 60 + rootMidi + 4; // 3rd
-              notes.push({ midi: third + 1, isTrip: false, ...getDegree(third + 1, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: third - 1, isTrip: false, ...getDegree(third - 1, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: third, isTrip: false, ...getDegree(third, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: null, isTrip: false, label: "", isCT: false, id: noteIdCounter++ }); // 休符
+              const third = 60 + rootMidi + 4;
+              notes.push({ midi: third + 1, dur: '8th', isTrip: false, ...getDegree(third + 1, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: third - 1, dur: '8th', isTrip: false, ...getDegree(third - 1, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: third, dur: 'quarter', isTrip: false, ...getDegree(third, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: null, dur: 'quarter', isTrip: false, shortLabel: "", type: "rest", id: noteIdCounter++ });
               curMidi = third;
             } else {
-              // 3連アルペジオ
               let p = curMidi;
-              notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: p + 3, isTrip: true, ...getDegree(p + 3, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: p + 7, isTrip: true, ...getDegree(p + 7, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: p + 10, isTrip: true, ...getDegree(p + 10, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: p + 12, isTrip: false, ...getDegree(p + 12, firstChord), id: noteIdCounter++ });
-              notes.push({ midi: null, isTrip: false, label: "", isCT: false, id: noteIdCounter++ });
+              notes.push({ midi: p, dur: 'quarter', isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p + 3, dur: 'trip', isTrip: true, ...getDegree(p + 3, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p + 7, dur: 'trip', isTrip: true, ...getDegree(p + 7, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p + 10, dur: 'trip', isTrip: true, ...getDegree(p + 10, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p + 12, dur: 'quarter', isTrip: false, ...getDegree(p + 12, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: null, dur: '8th', isTrip: false, shortLabel: "", type: "rest", id: noteIdCounter++ });
               curMidi = p + 12;
             }
 
           } else {
-            // 【ワイド・跳躍 & クロマチック】
+            // 【ワイド跳躍 & 3連クロマチック】
             let jump = curMidi < 66 ? curMidi + 14 : curMidi - 14;
             if (jump > MAX_NOTE) jump -= 12;
             if (jump < MIN_NOTE) jump += 12;
 
-            notes.push({ midi: curMidi, isTrip: false, ...getDegree(curMidi, firstChord), id: noteIdCounter++ });
-            notes.push({ midi: jump, isTrip: false, ...getDegree(jump, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: curMidi, dur: '8th', isTrip: false, ...getDegree(curMidi, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: jump, dur: '8th', isTrip: false, ...getDegree(jump, firstChord), id: noteIdCounter++ });
 
-            notes.push({ midi: jump - 1, isTrip: true, ...getDegree(jump - 1, firstChord), id: noteIdCounter++ });
-            notes.push({ midi: jump - 2, isTrip: true, ...getDegree(jump - 2, firstChord), id: noteIdCounter++ });
-            notes.push({ midi: jump - 3, isTrip: true, ...getDegree(jump - 3, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: jump - 1, dur: 'trip', isTrip: true, ...getDegree(jump - 1, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: jump - 2, dur: 'trip', isTrip: true, ...getDegree(jump - 2, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: jump - 3, dur: 'trip', isTrip: true, ...getDegree(jump - 3, firstChord), id: noteIdCounter++ });
 
-            notes.push({ midi: jump - 4, isTrip: false, ...getDegree(jump - 4, firstChord), id: noteIdCounter++ });
-            notes.push({ midi: null, isTrip: false, label: "", isCT: false, id: noteIdCounter++ });
+            notes.push({ midi: jump - 4, dur: 'quarter', isTrip: false, ...getDegree(jump - 4, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: null, dur: '8th', isTrip: false, shortLabel: "", type: "rest", id: noteIdCounter++ });
             curMidi = jump - 4;
           }
 
@@ -297,7 +307,7 @@
         setScoreData(measures);
       };
 
-      // オーディオ再生
+      // 再生制御
       const stopPlay = () => {
         if (timerRef.current) clearTimeout(timerRef.current);
         setIsPlaying(false);
@@ -336,16 +346,21 @@
             osc.frequency.setValueAtTime(freq, ctx.currentTime);
 
             gain.gain.setValueAtTime(0.25, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + beatSec * 0.85);
+            const playDur = n.dur === 'quarter' ? beatSec * 0.9 : beatSec * 0.45;
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + playDur);
 
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start();
-            osc.stop(ctx.currentTime + beatSec * 0.9);
+            osc.stop(ctx.currentTime + playDur + 0.05);
           }
 
           idx++;
-          const duration = n.isTrip ? (beatSec / 3) * 1000 : (idx % 2 === 1 ? swingLong * 1000 : swingShort * 1000);
+          let duration = beatSec * 0.5 * 1000;
+          if (n.isTrip) duration = (beatSec / 3) * 1000;
+          else if (n.dur === 'quarter') duration = beatSec * 1000;
+          else duration = (idx % 2 === 1 ? swingLong : swingShort) * 1000;
+
           timerRef.current = setTimeout(playNext, duration);
         };
 
@@ -373,30 +388,33 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Jazz Solo & TAB Etude</h1>
-                  <p className="text-xs text-slate-500">コードトーン・度数解析・ダイナミック跳躍ジャズエチュード</p>
+                  <p className="text-xs text-slate-500">五線譜＋タブ譜上下併記・度数バッジ付きエチュード生成ツール</p>
                 </div>
               </div>
 
-              {/* 表示モード排他切り替え */}
-              <div className="flex bg-slate-200/80 p-1 rounded-xl gap-1 border border-slate-300">
-                <button
-                  onClick={() => setViewMode('guitar')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${viewMode === 'guitar' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  ギター TAB
-                </button>
-                <button
-                  onClick={() => setViewMode('bass')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${viewMode === 'bass' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  ベース TAB (8vb)
-                </button>
-                <button
-                  onClick={() => setViewMode('score')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${viewMode === 'score' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  五線譜
-                </button>
+              {/* 併記TABの選択 */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">TAB併記:</span>
+                <div className="flex bg-slate-200/80 p-1 rounded-xl gap-1 border border-slate-300">
+                  <button
+                    onClick={() => setTabMode('guitar')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${tabMode === 'guitar' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    ギターTAB併記
+                  </button>
+                  <button
+                    onClick={() => setTabMode('bass')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${tabMode === 'bass' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    ベースTAB併記 (8vb)
+                  </button>
+                  <button
+                    onClick={() => setTabMode('none')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${tabMode === 'none' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    五線譜のみ
+                  </button>
+                </div>
               </div>
             </header>
 
@@ -404,7 +422,7 @@
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 print:hidden">
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  V7 アプローチ
+                  V7 (ドミナント) アプローチ
                 </label>
                 <div className="grid grid-cols-3 gap-1.5">
                   <button
@@ -460,15 +478,15 @@
             {/* 凡例 & プレイヤーバー */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-5 py-3 rounded-xl border border-slate-200 text-xs font-semibold print:hidden">
               <div className="flex items-center gap-5">
-                <span className="text-slate-500">度数カラー:</span>
-                <span className="flex items-center gap-1.5 text-amber-600">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> コードトーン (Root, 3, 5, 7)
+                <span className="text-slate-500">度数バッジ:</span>
+                <span className="flex items-center gap-1.5 text-amber-700">
+                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-[10px] font-bold border border-amber-300">R / 3 / 5 / 7</span> コードトーン
                 </span>
-                <span className="flex items-center gap-1.5 text-blue-600">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> テンション/オルタード (b9, #9, #11, b13, 9, 13)
+                <span className="flex items-center gap-1.5 text-blue-700">
+                  <span className="px-1.5 py-0.5 rounded bg-blue-100 text-[10px] font-bold border border-blue-300">♭9 / ♯9 / 13</span> テンション/オルタード
                 </span>
-                <span className="flex items-center gap-1.5 text-slate-500">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span> アプローチ (appr)
+                <span className="flex items-center gap-1.5 text-slate-600">
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-bold border border-slate-300">•</span> アプローチ/経過音
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -479,7 +497,7 @@
                     onChange={(e) => setIsBackingOnly(e.target.checked)}
                     className="w-4 h-4 text-blue-600 rounded"
                   />
-                  <span>伴奏のみ再生</span>
+                  <span>伴奏のみ</span>
                 </label>
                 <button
                   onClick={isPlaying ? stopPlay : startPlay}
@@ -490,132 +508,213 @@
               </div>
             </div>
 
-            {/* 楽譜 & TAB描画エンジン (HTML5 SVG) */}
+            {/* 楽譜 & TAB併記エンジン (HTML5 SVG) */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 overflow-x-auto print:border-none print:shadow-none custom-scrollbar">
-              <div className="min-w-[760px] space-y-8">
-                {Array.from({ length: Math.ceil(scoreData.length / 4) }).map((_, systemIdx) => {
-                  const systemMeasures = scoreData.slice(systemIdx * 4, systemIdx * 4 + 4);
-                  const isBass = viewMode === 'bass';
-                  const isScore = viewMode === 'score';
-                  const lineCount = isScore ? 5 : (isBass ? 4 : 6);
-                  const lineHeight = 14;
-                  const staffTop = 45;
-                  const totalHeight = staffTop + (lineCount - 1) * lineHeight + 40;
+              <div className="min-w-[760px] space-y-10">
+                {/* 1行あたり2小節でゆったり描画し、度数文字の重なりを完全解消 */}
+                {Array.from({ length: Math.ceil(scoreData.length / 2) }).map((_, systemIdx) => {
+                  const systemMeasures = scoreData.slice(systemIdx * 2, systemIdx * 2 + 2);
+                  const isBass = tabMode === 'bass';
+                  const hasTab = tabMode !== 'none';
+                  const tabLines = isBass ? 4 : 6;
+                  const tabLineHeight = 13;
+
+                  // 垂直レイアウト
+                  const trebleTop = 50;     // 五線譜の開始位置
+                  const trebleBottom = trebleTop + 4 * 9; // 36px幅
+                  const tabTop = hasTab ? trebleBottom + 45 : 0; // 五線譜の下にTABを配置
+                  const totalHeight = hasTab ? tabTop + (tabLines - 1) * tabLineHeight + 25 : trebleBottom + 30;
 
                   return (
-                    <div key={systemIdx} className="relative bg-white border-b border-slate-100 pb-6">
-                      <svg width="100%" height={totalHeight} viewBox={`0 0 840 ${totalHeight}`} className="overflow-visible">
-                        {/* 譜面線 (五線 / ギター6本 / ベース4本) */}
-                        {Array.from({ length: lineCount }).map((_, l) => (
+                    <div key={systemIdx} className="relative bg-white border-b border-slate-100 pb-8">
+                      <svg width="100%" height={totalHeight} viewBox={`0 0 860 ${totalHeight}`} className="overflow-visible">
+                        
+                        {/* === 五線譜の5本線 === */}
+                        {[0, 1, 2, 3, 4].map(l => (
                           <line
-                            key={l}
-                            x1="20"
-                            y1={staffTop + l * lineHeight}
-                            x2="820"
-                            y2={staffTop + l * lineHeight}
+                            key={`staff-${l}`}
+                            x1="30"
+                            y1={trebleTop + l * 9}
+                            x2="840"
+                            y2={trebleTop + l * 9}
                             stroke="#cbd5e1"
                             strokeWidth="1.2"
                           />
                         ))}
 
-                        {/* 小節線 */}
-                        {[20, 220, 420, 620, 820].map((x, idx) => (
-                          <line
-                            key={idx}
-                            x1={x}
-                            y1={staffTop}
-                            x2={x}
-                            y2={staffTop + (lineCount - 1) * lineHeight}
-                            stroke="#94a3b8"
-                            strokeWidth={idx === 4 ? "2.5" : "1.2"}
-                          />
-                        ))}
+                        {/* ト音記号 */}
+                        <text x="35" y={trebleTop + 28} fontSize="34" fill="#334155" fontFamily="serif" className="select-none">𝄞</text>
 
-                        {/* クレフ表記 */}
-                        {isScore ? (
-                          <text x="25" y={staffTop + 35} fontSize="32" fill="#1e293b" fontFamily="serif">𝄞</text>
-                        ) : (
-                          <g fill="#64748b" fontWeight="bold" fontSize="11" fontFamily="sans-serif">
-                            <text x="24" y={staffTop + 14}>T</text>
-                            <text x="24" y={staffTop + 27}>A</text>
-                            <text x="24" y={staffTop + 40}>B</text>
+                        {/* === TAB譜の平行線（併記モード時） === */}
+                        {hasTab && (
+                          <g>
+                            {Array.from({ length: tabLines }).map((_, l) => (
+                              <line
+                                key={`tab-${l}`}
+                                x1="30"
+                                y1={tabTop + l * tabLineHeight}
+                                x2="840"
+                                y2={tabTop + l * tabLineHeight}
+                                stroke="#e2e8f0"
+                                strokeWidth="1.2"
+                              />
+                            ))}
+                            <g fill="#94a3b8" fontWeight="bold" fontSize="10" fontFamily="sans-serif">
+                              <text x="35" y={tabTop + 14}>T</text>
+                              <text x="35" y={tabTop + 26}>A</text>
+                              <text x="35" y={tabTop + 38}>B</text>
+                            </g>
                           </g>
                         )}
 
-                        {/* 各小節 */}
+                        {/* システム全体の小節境界線 */}
+                        {[30, 435, 840].map((x, idx) => (
+                          <line
+                            key={`bar-${idx}`}
+                            x1={x}
+                            y1={trebleTop}
+                            x2={x}
+                            y2={hasTab ? tabTop + (tabLines - 1) * tabLineHeight : trebleBottom}
+                            stroke="#94a3b8"
+                            strokeWidth={idx === 2 ? "2" : "1.2"}
+                          />
+                        ))}
+
+                        {/* === 小節ごとの音符・TAB・度数バッジ描画 === */}
                         {systemMeasures.map((measure, mIdx) => {
-                          const measureLeft = 20 + mIdx * 200;
+                          const measureLeft = 30 + mIdx * 405;
+
                           return (
                             <g key={mIdx}>
-                              {/* コード名 */}
+                              {/* コードネーム */}
                               <text
-                                x={measureLeft + 15}
-                                y={22}
-                                fontSize="14"
+                                x={measureLeft + 30}
+                                y={26}
+                                fontSize="16"
                                 fontWeight="bold"
                                 fill="#0f172a"
                                 fontFamily="sans-serif"
                               >
                                 {measure.chord}
                               </text>
+                              {/* 小節番号 */}
                               <text
-                                x={measureLeft + 185}
-                                y={18}
-                                fontSize="9"
+                                x={measureLeft + 395}
+                                y={22}
+                                fontSize="10"
                                 fill="#94a3b8"
                                 textAnchor="end"
                               >
-                                {measure.measureNumber}
+                                m.{measure.measureNumber}
                               </text>
 
-                              {/* 各音符 */}
+                              {/* 音符＆TAB数字 */}
                               {measure.notes.map((note, nIdx) => {
-                                const noteX = measureLeft + 30 + nIdx * 20;
+                                // 1小節あたり最大8音（ゆったり40px間隔）
+                                const noteX = measureLeft + 45 + nIdx * 42;
                                 const isHighlight = activeNoteId === note.id;
 
                                 if (!note.midi) {
                                   // 休符
                                   return (
-                                    <text key={nIdx} x={noteX} y={staffTop + 28} fontSize="14" fill="#94a3b8">
+                                    <text key={nIdx} x={noteX} y={trebleTop + 22} fontSize="18" fill="#94a3b8">
                                       𝄽
                                     </text>
                                   );
                                 }
 
-                                const pos = getTabPosition(note.midi, isBass);
-                                const tabY = staffTop + (pos.string - 1) * lineHeight;
-                                const labelColor = note.isCT ? "#d97706" : (note.isAlt ? "#2563eb" : "#64748b");
+                                const noteY = getNoteStaffY(note.midi);
+                                const tabPos = getTabPosition(note.midi, isBass);
+                                const tabY = hasTab ? tabTop + (tabPos.string - 1) * tabLineHeight : 0;
+
+                                // 度数バッジのカラーリング
+                                let badgeBg = "#f1f5f9";
+                                let badgeBorder = "#cbd5e1";
+                                let badgeText = "#475569";
+                                if (note.type === 'ct') {
+                                  badgeBg = "#fef3c7";
+                                  badgeBorder = "#fde68a";
+                                  badgeText = "#b45309";
+                                } else if (note.type === 'alt' || note.type === 'tension') {
+                                  badgeBg = "#dbeafe";
+                                  badgeBorder = "#bfdbfe";
+                                  badgeText = "#1d4ed8";
+                                }
 
                                 return (
                                   <g key={nIdx}>
-                                    {/* 度数表記ラベル */}
-                                    <text
-                                      x={noteX}
-                                      y={staffTop - 12}
-                                      fontSize="10"
-                                      fontWeight="bold"
-                                      fill={labelColor}
-                                      textAnchor="middle"
-                                      className="select-none"
-                                    >
-                                      {note.label}
-                                    </text>
+                                    {/* 1. 度数バッジ（五線譜の上にゆったり配置、文字衝突ゼロ） */}
+                                    {note.shortLabel && (
+                                      <g transform={`translate(${noteX}, ${trebleTop - 20})`}>
+                                        <rect
+                                          x="-12"
+                                          y="-8"
+                                          width="24"
+                                          height="16"
+                                          rx="4"
+                                          fill={badgeBg}
+                                          stroke={badgeBorder}
+                                          strokeWidth="1"
+                                        />
+                                        <text
+                                          x="0"
+                                          y="3.5"
+                                          fontSize="10"
+                                          fontWeight="bold"
+                                          fill={badgeText}
+                                          textAnchor="middle"
+                                          className="select-none"
+                                        >
+                                          {note.shortLabel}
+                                        </text>
+                                      </g>
+                                    )}
 
-                                    {/* 3連符 */}
+                                    {/* 3連符マーク */}
                                     {note.isTrip && (
-                                      <text x={noteX} y={staffTop - 2} fontSize="8" fill="#3b82f6" textAnchor="middle" fontWeight="bold">
+                                      <text x={noteX} y={trebleTop - 2} fontSize="9" fill="#2563eb" textAnchor="middle" fontWeight="bold">
                                         3
                                       </text>
                                     )}
 
-                                    {/* TAB数字 or 五線譜音符 */}
-                                    {!isScore ? (
+                                    {/* 2. 五線譜の音符本体（符頭・符尾） */}
+                                    <g>
+                                      {/* 加線（五線譜からはみ出る高音・低音） */}
+                                      {noteY > trebleBottom && (
+                                        <line x1={noteX - 7} y1={trebleBottom + 9} x2={noteX + 7} y2={trebleBottom + 9} stroke="#94a3b8" strokeWidth="1.2" />
+                                      )}
+                                      {noteY < trebleTop && (
+                                        <line x1={noteX - 7} y1={trebleTop - 9} x2={noteX + 7} y2={trebleTop - 9} stroke="#94a3b8" strokeWidth="1.2" />
+                                      )}
+
+                                      {/* 符頭 */}
+                                      <ellipse
+                                        cx={noteX}
+                                        cy={noteY}
+                                        rx="4.8"
+                                        ry="3.6"
+                                        transform={`rotate(-20, ${noteX}, ${noteY})`}
+                                        fill={isHighlight ? "#2563eb" : "#0f172a"}
+                                      />
+                                      {/* 符尾（上向きステム） */}
+                                      <line
+                                        x1={noteX + 4.2}
+                                        y1={noteY}
+                                        x2={noteX + 4.2}
+                                        y2={noteY - 24}
+                                        stroke={isHighlight ? "#2563eb" : "#0f172a"}
+                                        strokeWidth="1.3"
+                                      />
+                                    </g>
+
+                                    {/* 3. 真下に併記されるTAB譜（五線譜と縦位置が完全一致） */}
+                                    {hasTab && tabPos && (
                                       <g>
                                         <rect
-                                          x={noteX - 7}
-                                          y={tabY - 8}
-                                          width="14"
-                                          height="16"
+                                          x={noteX - 8}
+                                          y={tabY - 7}
+                                          width="16"
+                                          height="14"
                                           fill={isHighlight ? "#2563eb" : "#ffffff"}
                                           rx="3"
                                         />
@@ -628,25 +727,8 @@
                                           textAnchor="middle"
                                           className="select-none"
                                         >
-                                          {pos.fret}
+                                          {tabPos.fret}
                                         </text>
-                                      </g>
-                                    ) : (
-                                      <g>
-                                        <circle
-                                          cx={noteX}
-                                          cy={staffTop + (80 - note.midi) * 2.2}
-                                          r="4.5"
-                                          fill={isHighlight ? "#2563eb" : "#1e293b"}
-                                        />
-                                        <line
-                                          x1={noteX + 4}
-                                          y1={staffTop + (80 - note.midi) * 2.2}
-                                          x2={noteX + 4}
-                                          y2={staffTop + (80 - note.midi) * 2.2 - 20}
-                                          stroke="#1e293b"
-                                          strokeWidth="1.2"
-                                        />
                                       </g>
                                     )}
                                   </g>
@@ -664,7 +746,7 @@
 
           </div>
 
-          {/* 曲プリセット選択モーダル */}
+          {/* スタンダード曲選択モーダル */}
           {isModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
