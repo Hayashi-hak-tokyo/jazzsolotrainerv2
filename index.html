@@ -25,12 +25,18 @@
     .abcjs-highlight { fill: #2563eb !important; stroke: #2563eb !important; }
     .abcjs-tempo { display: none !important; }
 
+    /* コードネームと度数のフォント・位置 */
     .abcjs-chord { font-size: 16px !important; font-weight: 800 !important; fill: #0f172a !important; }
+    .abcjs-annotation { font-size: 11px !important; font-weight: 700 !important; fill: #b45309 !important; font-family: sans-serif !important; }
 
+    /* TAB譜 */
+    .abcjs-tablature line { stroke: #cbd5e1; }
+    .abcjs-tablature text { fill: #0f172a; font-weight: bold; font-family: monospace; font-size: 13px; }
+    
     #paper { padding-bottom: 20px; }
     #paper svg { 
       overflow: visible !important; 
-      margin-bottom: 20px !important; 
+      margin-bottom: 30px !important; 
       width: 100% !important;
       height: auto !important;
     }
@@ -74,7 +80,7 @@
       },
       {
         title: "All The Things You Are",
-        key: "Ab",
+        key: "Ab", // 調号: Bb, Eb, Ab, Db
         measures: 36,
         chords: [
           "Fm7", "Bbm7", "Eb7", "Abmaj7", "Dbmaj7", "G7", "Cmaj7", "Cmaj7",
@@ -159,7 +165,6 @@
       const [audioAbcString, setAudioAbcString] = useState("");
       const [backingAbcString, setBackingAbcString] = useState("");
       const [isBackingOnly, setIsBackingOnly] = useState(false);
-      const [noteDataList, setNoteDataList] = useState([]);
       
       const [abcjsLoaded, setAbcjsLoaded] = useState(false);
       const [isModalOpen, setIsModalOpen] = useState(false);
@@ -194,23 +199,34 @@
         }
       }, [abcjsLoaded, chords]);
 
-      // レンダリングとTABレイヤーの精密描画
+      // 譜面とTABのレンダリング（abcjs正規TABエンジン）
       useEffect(() => {
         if (abcjsLoaded && abcString && window.ABCJS) {
+          let tablatureOptions = [];
+          if (tabView === 'guitar') {
+            tablatureOptions = [{
+              instrument: 'guitar',
+              label: 'TAB (Gt)',
+              tuning: ['E,', 'A,', 'D', 'G', 'B', 'e']
+            }];
+          } else if (tabView === 'bass') {
+            tablatureOptions = [{
+              instrument: 'guitar',
+              label: 'TAB (Bass 8vb)',
+              tuning: ['E,,', 'A,,', 'D,', 'G,']
+            }];
+          }
+
           window.ABCJS.renderAbc("paper", abcString, {
             responsive: "resize",
             add_classes: true,
-            paddingtop: 35,
-            paddingbottom: 40,
+            paddingtop: 25,
+            paddingbottom: 30,
             paddingleft: 0,
             paddingright: 0,
-            staffwidth: 820
+            staffwidth: 820,
+            tablature: tablatureOptions
           });
-
-          // 五線譜の音符要素の座標に合わせたTAB・度数の精密描画
-          setTimeout(() => {
-            renderTabAndDegreeLayer();
-          }, 40);
 
           const currentAudioString = isBackingOnly ? backingAbcString : audioAbcString;
           const visualObjForAudio = window.ABCJS.renderAbc("audio-paper", currentAudioString, {
@@ -275,122 +291,6 @@
         }
       }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsLoaded, tabView, showDegrees]);
 
-      // 【完全開放弦ゼロ・無理のない運指】SVG TAB & 度数レイヤー
-      const renderTabAndDegreeLayer = () => {
-        const svg = document.querySelector("#paper svg");
-        if (!svg) return;
-
-        const oldLayer = svg.querySelector("#custom-overlay-layer");
-        if (oldLayer) oldLayer.remove();
-
-        const overlayGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        overlayGroup.setAttribute("id", "custom-overlay-layer");
-
-        const noteElements = svg.querySelectorAll(".abcjs-note");
-        const staffElements = svg.querySelectorAll(".abcjs-staff");
-        const isBass = tabView === 'bass';
-        const hasTab = tabView !== 'none';
-        const stringCount = isBass ? 4 : 6;
-        const lineSpacing = 11;
-
-        // 各段（システム）ごとにTABの平行線を描画
-        if (hasTab) {
-          staffElements.forEach((staff) => {
-            const sBox = staff.getBBox();
-            const tabTop = sBox.y + sBox.height + 25;
-
-            // 平行線
-            for (let s = 0; s < stringCount; s++) {
-              const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-              line.setAttribute("x1", sBox.x);
-              line.setAttribute("y1", tabTop + s * lineSpacing);
-              line.setAttribute("x2", sBox.x + sBox.width);
-              line.setAttribute("y2", tabTop + s * lineSpacing);
-              line.setAttribute("stroke", "#cbd5e1");
-              line.setAttribute("stroke-width", "1.2");
-              overlayGroup.appendChild(line);
-            }
-
-            // ラベル
-            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            label.setAttribute("x", sBox.x + 3);
-            label.setAttribute("y", tabTop + (isBass ? 20 : 32));
-            label.setAttribute("font-size", "10");
-            label.setAttribute("font-weight", "bold");
-            label.setAttribute("fill", "#64748b");
-            label.textContent = isBass ? "TAB(B)" : "TAB(Gt)";
-            overlayGroup.appendChild(label);
-          });
-        }
-
-        // 各音符ごとに度数とTAB数字を配置
-        noteElements.forEach((noteEl, idx) => {
-          const data = noteDataList[idx];
-          if (!data) return;
-
-          const nBox = noteEl.getBBox();
-          const noteCenterX = nBox.x + nBox.width / 2;
-
-          // 最も近い五線を探す
-          let closestStaff = null;
-          let minDist = 9999;
-          staffElements.forEach(st => {
-            const sBox = st.getBBox();
-            const dist = Math.abs(nBox.y - sBox.y);
-            if (dist < minDist) {
-              minDist = dist;
-              closestStaff = sBox;
-            }
-          });
-          if (!closestStaff) return;
-
-          // 1. 度数バッジ（音符の頭上、五線のすぐ上に整然と配置）
-          if (showDegrees && data.degree) {
-            const degreeY = closestStaff.y - 12;
-
-            const degText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            degText.setAttribute("x", noteCenterX);
-            degText.setAttribute("y", degreeY);
-            degText.setAttribute("text-anchor", "middle");
-            degText.setAttribute("font-size", "11");
-            degText.setAttribute("font-weight", "bold");
-            degText.setAttribute("fill", "#b45309"); // アンバーゴールド
-            degText.textContent = data.degree;
-            overlayGroup.appendChild(degText);
-          }
-
-          // 2. TABフレット番号（五線の直下、指定の弦の上に配置）
-          if (hasTab) {
-            const tabTop = closestStaff.y + closestStaff.height + 25;
-            const pos = isBass ? data.bassTab : data.guitarTab;
-            const fretY = tabTop + (pos.string - 1) * lineSpacing;
-
-            // 数字の後ろの線を隠す白背景マスク
-            const mask = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            mask.setAttribute("x", noteCenterX - 6);
-            mask.setAttribute("y", fretY - 6);
-            mask.setAttribute("width", 12);
-            mask.setAttribute("height", 11);
-            mask.setAttribute("fill", "#ffffff");
-            mask.setAttribute("rx", "2");
-            overlayGroup.appendChild(mask);
-
-            // フレット番号（1〜14フレット。開放弦0は絶対に出ない）
-            const fretText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            fretText.setAttribute("x", noteCenterX);
-            fretText.setAttribute("y", fretY + 3.5);
-            fretText.setAttribute("text-anchor", "middle");
-            fretText.setAttribute("font-size", "11");
-            fretText.setAttribute("font-weight", "bold");
-            fretText.setAttribute("fill", "#0f172a");
-            fretText.textContent = pos.fret;
-            overlayGroup.appendChild(fretText);
-          }
-        });
-
-        svg.appendChild(overlayGroup);
-      };
-
       // 【R, 3, 5, 7】コードトーン判定
       const getChordToneInfo = (chordStr) => {
         const match = chordStr.match(/^[A-G][#b]?/);
@@ -406,7 +306,6 @@
         // 純粋コードトーン: R, 3, 5, 7
         let chordIntervals = [0, isMinor ? 3 : 4, isDim ? 6 : 7, isMajor ? 11 : (type.includes('dim7') ? 9 : 10)];
 
-        // ドミナント7thのアプローチ設定
         if (isV7) {
           if (v7Approach === 'altered') {
             chordIntervals = [0, 1, 3, 4, 6, 8, 10]; // 1, b9, #9, 3, #11, b13, b7
@@ -437,44 +336,52 @@
         }
       };
 
-      // ギター厳密運指（2〜14フレット固定。開放弦0は絶対に出ない）
-      const getStrictGuitarTab = (midi) => {
-        const tunings = [
-          { s: 1, open: 64 }, // E4
-          { s: 2, open: 59 }, // B3
-          { s: 3, open: 55 }, // G3
-          { s: 4, open: 50 }, // D3
-          { s: 5, open: 45 }, // A2
-          { s: 6, open: 40 }  // E2
+      // ギター開放弦（0フレット）を完全に禁止する弦の割り当て
+      // ギターチューニング: 1弦=64(E4), 2弦=59(B3), 3弦=55(G3), 4弦=50(D3), 5弦=45(A2), 6弦=40(E2)
+      const getNonOpenStringForGuitar = (midi) => {
+        const stringTunings = [
+          { s: 1, open: 64 },
+          { s: 2, open: 59 },
+          { s: 3, open: 55 },
+          { s: 4, open: 50 },
+          { s: 5, open: 45 },
+          { s: 6, open: 40 }
         ];
-        for (let t of tunings) {
+        // 0フレット（開放弦）を禁止し、1〜20フレットに収まる弦を選択
+        for (let t of stringTunings) {
           const fret = midi - t.open;
-          if (fret >= 2 && fret <= 14) {
-            return { string: t.s, fret };
+          if (fret >= 1 && fret <= 20) {
+            // 特に5〜15フレットの中域ボックスを優先
+            if (fret >= 4 && fret <= 15) return t.s;
           }
         }
-        return { string: 1, fret: Math.max(2, midi - 64) };
+        for (let t of stringTunings) {
+          const fret = midi - t.open;
+          if (fret >= 1 && fret <= 20) return t.s;
+        }
+        return 1;
       };
 
-      // ベース厳密運指（4弦ベースの第2〜第8フレット周辺に美しく収まる）
-      const getStrictBassTab = (midi) => {
-        const bassMidi = midi - 12; // 実音ピッチを変えずにTABのみ1オクターブ下 (8vb)
-        const tunings = [
-          { s: 1, open: 43 }, // G2
-          { s: 2, open: 38 }, // D2
-          { s: 3, open: 33 }, // A1
-          { s: 4, open: 28 }  // E1
+      // 4弦ベース用（開放弦を禁止し、実音を1オクターブ下げて2〜12フレットに収める）
+      // ベースチューニング: 1弦=43(G2), 2弦=38(D2), 3弦=33(A1), 4弦=28(E1)
+      const getNonOpenStringForBass = (midi) => {
+        const bassMidi = midi - 12; // 8vb
+        const bassTunings = [
+          { s: 1, open: 43 },
+          { s: 2, open: 38 },
+          { s: 3, open: 33 },
+          { s: 4, open: 28 }
         ];
-        for (let t of tunings) {
+        for (let t of bassTunings) {
           const fret = bassMidi - t.open;
-          if (fret >= 2 && fret <= 9) {
-            return { string: t.s, fret };
+          if (fret >= 1 && fret <= 12) {
+            return t.s;
           }
         }
-        return { string: 1, fret: Math.max(2, bassMidi - 43) };
+        return 1;
       };
 
-      // 調号に準拠（二重フラットを完全排除）
+      // 調号に合致した音名変換（二重フラットを排除）
       const midiToAbcByKey = (midi, keySig, measureAccRef) => {
         const flatsInKey = KEY_FLATS[keySig] || [];
         const pitchClass = midi % 12;
@@ -540,16 +447,16 @@
         return `[${r}${t}${s}]4 [${r}${t}${s}]4`;
       };
 
-      // エチュード生成エンジン（R, 3, 5, 7特化・同音重複禁止・開放弦ゼロ）
+      // エチュード生成エンジン（最高1弦20Fまで使用・開放弦0ゼロ・R,3,5,7特化）
       const generateEtude = () => {
         let displayMelody = "";
         let audioMelody = "";
         let compingStr = "";
-        let noteData = [];
 
         const keySig = currentSong.key || "C";
-        const SAFE_MIN = 56; // 4弦6F〜
-        const SAFE_MAX = 80; // 1弦16F〜
+        // ★ギター音域ルール厳守: 最低音 6弦1F(F2=41) 〜 最高音 1弦20F(C6=84)
+        const SAFE_MIN = 48; // 5弦3F(C3)〜
+        const SAFE_MAX = 84; // 1弦20F(C6)
 
         let lastPitch = -1;
 
@@ -568,12 +475,13 @@
           // ピアノ伴奏のみ
           compingStr += getPianoCompingAbc(firstChord, keySig, accComp) + " | ";
 
-          // コードトーンの音高プール（R, 3, 5, 7 のみ）
+          // コードトーン（R, 3, 5, 7）プール
           let pool = [];
-          for (let oct = 4; oct <= 6; oct++) {
+          for (let oct = 3; oct <= 6; oct++) {
             chordInfo.scaleIntervals.forEach(interval => {
               const p = oct * 12 + interval;
-              if (p >= SAFE_MIN && p <= SAFE_MAX && ![55, 59, 64].includes(p)) {
+              // 48〜84（1弦20F）までしっかり活用
+              if (p >= SAFE_MIN && p <= SAFE_MAX) {
                 pool.push(p);
               }
             });
@@ -601,32 +509,26 @@
             measurePitches.push(nextP);
           }
 
-          // 2音ずつビームで束ねる
+          // 2音ずつビームで連結し、弦番号を指定して開放弦0を完全に防止
           for (let i = 0; i < measurePitches.length; i += 2) {
             const p1 = measurePitches[i];
             const p2 = measurePitches[i + 1];
 
-            const deg1 = getExactDegree(p1 % 12, chordInfo.rootPitch, chordInfo.isV7);
-            const deg2 = getExactDegree(p2 % 12, chordInfo.rootPitch, chordInfo.isV7);
+            const deg1 = showDegrees ? getExactDegree(p1 % 12, chordInfo.rootPitch, chordInfo.isV7) : "";
+            const deg2 = showDegrees ? getExactDegree(p2 % 12, chordInfo.rootPitch, chordInfo.isV7) : "";
 
             const abc1 = midiToAbcByKey(p1, keySig, accV1);
             const abc2 = midiToAbcByKey(p2, keySig, accV1);
 
-            displayMelody += `${abc1}${abc2} `;
-            audioMelody += `${abc1}${abc2} `;
+            // 開放弦を阻止するための弦指定（例: !3! で3弦押弦）
+            const str1 = tabView === 'bass' ? getNonOpenStringForBass(p1) : getNonOpenStringForGuitar(p1);
+            const str2 = tabView === 'bass' ? getNonOpenStringForBass(p2) : getNonOpenStringForGuitar(p2);
 
-            noteData.push({
-              midi: p1,
-              degree: deg1,
-              guitarTab: getStrictGuitarTab(p1),
-              bassTab: getStrictBassTab(p1)
-            });
-            noteData.push({
-              midi: p2,
-              degree: deg2,
-              guitarTab: getStrictGuitarTab(p2),
-              bassTab: getStrictBassTab(p2)
-            });
+            const annot1 = deg1 ? `^"${deg1}"` : "";
+            const annot2 = deg2 ? `^"${deg2}"` : "";
+
+            displayMelody += `${annot1}!${str1}!${abc1}${annot2}!${str2}!${abc2} `;
+            audioMelody += `${abc1}${abc2} `;
           }
 
           displayMelody += "| ";
@@ -639,8 +541,6 @@
           }
         }
 
-        setNoteDataList(noteData);
-
         // ABC譜面ヘッダー
         let header = "X: 1\n";
         header += `T: ${currentSong.title || "Jazz Solo Etude"}\n`;
@@ -650,18 +550,18 @@
         header += "%%staffwidth 820\n";
         header += "%%stretchlast 1\n";
         header += "%%gchord 28\n";
-        header += "V: 1 clef=treble\n";
+        header += "%%annotationfont 11\n";
         setAbcString(header + displayMelody);
 
-        // ピアノ伴奏のみのオーディオ
+        // オーディオ（ピアノ伴奏のみ）
         let audioH = "X: 1\n";
         audioH += "M: 4/4\n";
         audioH += "L: 1/8\n";
         audioH += `Q: 1/4=${bpm}\n`;
         audioH += `K: ${keySig}\n`;
         audioH += "%%staves (1 2)\n";
-        audioH += "V: 1 clef=treble\n%%MIDI program 26\n%%MIDI control 7 115\n"; // Guitar Solo
-        audioH += "V: 2 clef=treble\n%%MIDI program 0\n%%MIDI control 7 70\n";   // Piano Comping Only
+        audioH += "V: 1 clef=treble\n%%MIDI program 26\n%%MIDI control 7 115\n"; // Guitar
+        audioH += "V: 2 clef=treble\n%%MIDI program 0\n%%MIDI control 7 70\n";   // Piano Only
 
         setAudioAbcString(audioH + "[V: 1]\n" + audioMelody + "[V: 2]\n" + compingStr);
         setBackingAbcString(audioH + "[V: 1]\n%%MIDI control 7 0\n" + audioMelody + "[V: 2]\n" + compingStr);
@@ -688,7 +588,7 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Jazz Chord Tone Solo & TAB</h1>
-                  <p className="text-xs text-slate-500">コードトーン（R, 3, 5, 7）特化・開放弦ゼロ・ボックス運指・ピアノ伴奏</p>
+                  <p className="text-xs text-slate-500">コードトーン (R, 3, 5, 7) 特化・1弦20Fまで使用・開放弦ゼロ保証・ピアノ伴奏のみ</p>
                 </div>
               </div>
 
@@ -700,13 +600,13 @@
                     onClick={() => setTabView('guitar')}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${tabView === 'guitar' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                   >
-                    ギターTAB併記 (2〜14F)
+                    ギターTAB併記 (20Fまで活用)
                   </button>
                   <button
                     onClick={() => setTabView('bass')}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${tabView === 'bass' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                   >
-                    ベースTAB併記 (8vb・2〜9F)
+                    ベースTAB併記 (8vb・2〜12F)
                   </button>
                   <button
                     onClick={() => setTabView('none')}
@@ -800,7 +700,7 @@
                       }}
                       className="w-4 h-4 text-amber-600 rounded border-slate-300"
                     />
-                    <span>度数注記（音符の頭上）を表示</span>
+                    <span>度数注記（R, 3, 5, 7）を表示</span>
                   </label>
                 </div>
 
