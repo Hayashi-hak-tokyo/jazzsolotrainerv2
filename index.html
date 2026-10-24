@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Solo Etude - Accurate Degrees & Frets</title>
+  <title>Jazz Solo Etude - Accurate TAB & Degrees</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,14 +20,18 @@
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     
-    .abcjs-note { fill: #1e293b; }
+    .abcjs-note { fill: #0f172a; }
     .abcjs-staff { stroke: #64748b; }
     .abcjs-highlight { fill: #2563eb !important; stroke: #2563eb !important; }
     .abcjs-tempo { display: none !important; }
 
+    /* コードネームと度数ラベルのスタイリング */
+    .abcjs-chord { font-size: 15px !important; font-weight: 800 !important; fill: #0f172a !important; }
+    .abcjs-annotation { font-size: 11px !important; font-weight: 700 !important; fill: #b45309 !important; font-family: sans-serif !important; }
+
+    /* TAB譜スタイル */
     .abcjs-tablature line { stroke: #cbd5e1; }
     .abcjs-tablature text { fill: #0f172a; font-weight: bold; font-family: monospace; font-size: 13px; }
-    .abcjs-annotation { font-weight: 800; font-size: 12px; fill: #b45309; }
     
     #paper { padding-bottom: 20px; }
     #paper svg { 
@@ -179,7 +183,7 @@
         }
       }, [abcjsLoaded, chords]);
 
-      // レンダリング設定
+      // 譜面レンダリング
       useEffect(() => {
         if (abcjsLoaded && abcString && window.ABCJS) {
           let tablatureOptions = [];
@@ -200,7 +204,7 @@
           window.ABCJS.renderAbc("paper", abcString, {
             responsive: "resize",
             add_classes: true,
-            paddingtop: 15,
+            paddingtop: 20,
             paddingbottom: 30,
             paddingleft: 0,
             paddingright: 0,
@@ -271,7 +275,7 @@
         }
       }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsLoaded, tabView]);
 
-      // 【厳密な度数判定】ルート音と音程差からジャズ理論に基づき正確に算出
+      // 厳密な度数判定
       const getAccurateDegreeLabel = (midi, chordStr) => {
         if (!chordStr) return "";
         const match = chordStr.match(/^[A-G][#b]?/);
@@ -280,9 +284,7 @@
         const rootPitch = PITCH_CLASSES[root];
         if (rootPitch === undefined) return "";
 
-        const pitchClass = midi % 12;
-        // ルートからの半音インターバル (0〜11)
-        const semitones = (pitchClass - rootPitch + 12) % 12;
+        const semitones = (midi % 12 - rootPitch + 12) % 12;
         const type = chordStr.substring(root.length);
 
         const isMinor = type.includes('m') && !type.includes('maj');
@@ -290,79 +292,26 @@
         const isMajor = type.includes('maj') || type.includes('M7') || type.includes('△');
         const isV7 = type.includes('7') && !isMinor && !isMajor && !isDim;
 
-        // 半音数ごとの度数ラベル対応表
         switch (semitones) {
-          case 0:
-            return "R";
-          case 1:
-            return isV7 ? "♭9" : "";
-          case 2:
-            return "9";
-          case 3:
-            if (isMinor || isDim) return "♭3";
-            if (isV7) return "♯9";
-            return "";
-          case 4:
-            if (!isMinor) return "3";
-            return "";
-          case 5:
-            return isMinor ? "11" : "";
-          case 6:
-            if (isDim) return "♭5";
-            if (isV7) return "♯11";
-            return "";
-          case 7:
-            if (!isDim) return "5";
-            return "";
-          case 8:
-            if (isV7) return "♭13";
-            return "";
-          case 9:
-            if (isDim) return "6";
-            return "13";
-          case 10:
-            if (isV7 || isMinor || isDim) return "7";
-            return "";
-          case 11:
-            if (isMajor) return "△7";
-            return "";
-          default:
-            return "";
+          case 0:  return "R";
+          case 1:  return isV7 ? "♭9" : "";
+          case 2:  return "9";
+          case 3:  return (isMinor || isDim) ? "♭3" : (isV7 ? "♯9" : "");
+          case 4:  return !isMinor ? "3" : "";
+          case 5:  return isMinor ? "11" : "";
+          case 6:  return isDim ? "♭5" : (isV7 ? "♯11" : "");
+          case 7:  return !isDim ? "5" : "";
+          case 8:  return isV7 ? "♭13" : "";
+          case 9:  return isDim ? "6" : "13";
+          case 10: return (isV7 || isMinor || isDim) ? "7" : "";
+          case 11: return isMajor ? "△7" : "";
+          default: return "";
         }
       };
 
-      // ギターの弦選択（開放弦0フレットを完全禁止し、1〜20Fのボックスに収める）
-      const chooseGuitarStringWithoutOpen = (midi) => {
-        // 各弦の開放弦ピッチ: 1弦=64(E4), 2弦=59(B3), 3弦=55(G3), 4弦=50(D3), 5弦=45(A2), 6弦=40(E2)
-        const tunings = [
-          { str: 1, open: 64 },
-          { str: 2, open: 59 },
-          { str: 3, open: 55 },
-          { str: 4, open: 50 },
-          { str: 5, open: 45 },
-          { str: 6, open: 40 }
-        ];
-
-        // 1フレット以上で弾ける弦候補を探す（0フレット＝開放弦は除外）
-        let candidates = [];
-        for (let t of tunings) {
-          const fret = midi - t.open;
-          // フレットが1〜20の範囲内（0は絶対に使わない）
-          if (fret >= 1 && fret <= 20) {
-            // 4〜10フレット周辺の弾きやすいポジションにボーナススコア
-            const score = Math.abs(fret - 7);
-            candidates.push({ str: t.str, fret, score });
-          }
-        }
-
-        if (candidates.length > 0) {
-          candidates.sort((a, b) => a.score - b.score);
-          return candidates[0].str;
-        }
-        return 1;
-      };
-
-      const midiToAbc = (midi, chordStr, measureAccRef, forceString = null) => {
+      // MIDI音高からABC記譜文字列（オクターブ・変化記号を完全に厳密化）
+      // C4 = MIDI 60 (ABC: C), C5 = MIDI 72 (ABC: c), C3 = MIDI 48 (ABC: C,)
+      const midiToAbc = (midi, chordStr, measureAccRef) => {
         let isFlatKey = false;
         if (chordStr) {
           const match = chordStr.match(/^[A-G][#b]?/);
@@ -377,21 +326,20 @@
           ? ['', '_', '', '_', '', '', '_', '', '_', '', '_', '']
           : ['', '^', '', '^', '', '', '^', '', '^', '', '^', ''];
 
-        const octave = Math.floor(midi / 12) - 1;
         const noteClass = midi % 12;
+        const octave = Math.floor(midi / 12) - 1; // 4=octave4(C4=60), 5=octave5(c=72), 3=octave3(C,=48)
         const base = noteNames[noteClass];
         const targetAcc = defaultAcc[noteClass];
 
         let abc = base;
-        if (octave <= 3) {
-          for (let k = 4; k > octave; k--) abc += ",";
+        if (octave === 3) {
+          abc = base + ",";
         } else if (octave === 4) {
           abc = base;
         } else if (octave === 5) {
           abc = base.toLowerCase();
-        } else if (octave >= 6) {
-          abc = base.toLowerCase();
-          for (let k = 5; k < octave; k++) abc += "'";
+        } else if (octave === 6) {
+          abc = base.toLowerCase() + "'";
         }
 
         const key = base + octave;
@@ -402,8 +350,7 @@
           measureAccRef[key] = targetAcc;
         }
 
-        const stringDirective = forceString ? `!${forceString}!` : "";
-        return stringDirective + prefix + abc;
+        return prefix + abc;
       };
 
       const clampBass = (m) => {
@@ -413,18 +360,20 @@
         return n;
       };
 
-      // フレーズ生成エンジン
+      // フレーズ生成エンジン（開放弦を完全排除・5〜15Fの実戦ポジションに固定）
       const generateEtude = () => {
         let displayMelody = "";
         let audioMelody = "";
         let compingStr = "";
         let bassStr = "";
 
-        // 音域制約: 最低音 6弦1フレット (F1 = MIDI 41)、最高音 1弦20フレット (C6 = MIDI 84)
-        const MIN_MIDI = 41; // 6弦1F (F1)
-        const MAX_MIDI = 84; // 1弦20F (C6)
+        // ★ギター開放弦(E2=40, A2=45, D3=50, G3=55, B3=59, E4=64)を避けるため、
+        // ジャズギターで最も弾きやすい「5フレット〜15フレット」の王道ポジションに音域を集中
+        // 最低音: 5弦5F (D3 = MIDI 50) 〜 1弦17F (A5 = MIDI 81)
+        const POS_MIN = 50; 
+        const POS_MAX = 81;
 
-        let curMidi = 62; // D4
+        let curMidi = 62; // D4 付近
 
         for (let m = 0; m < measureCount; m++) {
           const chordStr = chords[m] || "Cmaj7";
@@ -441,7 +390,7 @@
           displayMelody += `"${firstChord}"`;
           audioMelody += `"${firstChord}"`;
 
-          // バッキング
+          // バッキング（ピアノ・ベース）
           const bassRoot = 36 + rootMidi;
           compingStr += `[${midiToAbc(52 + rootMidi, firstChord, accV2)}${midiToAbc(55 + rootMidi, firstChord, accV2)}${midiToAbc(59 + rootMidi, firstChord, accV2)}]8 | `;
           bassStr += `${midiToAbc(clampBass(bassRoot), firstChord, accV3)}2 ${midiToAbc(clampBass(bassRoot + 7), firstChord, accV3)}2 ${midiToAbc(clampBass(bassRoot + 4), firstChord, accV3)}2 ${midiToAbc(clampBass(bassRoot + 5), firstChord, accV3)}2 | `;
@@ -449,50 +398,36 @@
           const pattern = m % 4;
 
           const formatNote = (midi, duration = "") => {
-            // 41〜84の範囲に制限
             let safeMidi = midi;
-            while (safeMidi > MAX_MIDI) safeMidi -= 12;
-            while (safeMidi < MIN_MIDI) safeMidi += 12;
+            while (safeMidi > POS_MAX) safeMidi -= 12;
+            while (safeMidi < POS_MIN) safeMidi += 12;
 
-            // 開放弦を避けるため強制弦指定を付与
-            const assignedString = chooseGuitarStringWithoutOpen(safeMidi);
-            const abc = midiToAbc(safeMidi, firstChord, accV1, assignedString);
-            const rawAbc = midiToAbc(safeMidi, firstChord, accV1);
-            
+            const abc = midiToAbc(safeMidi, firstChord, accV1);
             const degree = showDegrees ? getAccurateDegreeLabel(safeMidi, firstChord) : "";
-            const annot = degree ? `"${degree}"` : "";
-            return { display: `${annot}${abc}${duration}`, audio: `${rawAbc}${duration}` };
+            
+            // ★度数は音符の下に配置（_ "R"）してコードネームとの重なりを物理的に防止
+            const annot = degree ? `_"${degree}"` : "";
+            return { display: `${annot}${abc}${duration}`, audio: `${abc}${duration}` };
           };
 
           if (pattern === 0) {
-            // 【弦移動アルペジオ（ボックス運指・開放弦なし）】
-            // 6弦または5弦の押弦からスタート
-            let baseP = 53 + rootMidi; // F2〜中域
-            while (baseP < 48) baseP += 12;
-            while (baseP > 62) baseP -= 12;
+            // 【弦移動アルペジオ】4弦〜1弦を自然に渡りながら上昇（横スライド・開放弦なし）
+            let baseP = 55 + rootMidi; // 4弦7F〜
+            while (baseP < POS_MIN) baseP += 12;
+            while (baseP > 64) baseP -= 12;
 
-            // 弦を跨いでスムーズに上昇
-            const p1 = baseP;      // 5弦
-            const p2 = baseP + 4;  // 4弦
-            const p3 = baseP + 7;  // 3弦
-            const p4 = baseP + 11; // 2弦
-            const p5 = baseP + 14; // 1弦
-            const p6 = baseP + 12; // 1弦
-            const p7 = baseP + 9;  // 2弦
-            const p8 = baseP + 7;  // 3弦
-
-            let n1 = formatNote(p1);
-            let n2 = formatNote(p2);
-            let n3 = formatNote(p3);
-            let n4 = formatNote(p4);
-            let n5 = formatNote(p5);
-            let n6 = formatNote(p6);
-            let n7 = formatNote(p7);
-            let n8 = formatNote(p8);
+            let n1 = formatNote(baseP);
+            let n2 = formatNote(baseP + 4);
+            let n3 = formatNote(baseP + 7);
+            let n4 = formatNote(baseP + 11);
+            let n5 = formatNote(baseP + 14);
+            let n6 = formatNote(baseP + 12);
+            let n7 = formatNote(baseP + 9);
+            let n8 = formatNote(baseP + 7);
 
             displayMelody += `${n1.display}${n2.display} ${n3.display}${n4.display} ${n5.display}${n6.display} ${n7.display}${n8.display} | `;
             audioMelody += `${n1.audio}${n2.audio} ${n3.audio}${n4.audio} ${n5.audio}${n6.audio} ${n7.audio}${n8.audio} | `;
-            curMidi = p8;
+            curMidi = baseP + 7;
 
           } else if (pattern === 1) {
             // 【ビバップ・ターン3連符 & スケール下降】
@@ -524,7 +459,7 @@
               const n2 = formatNote(tension - 1);
               const n3 = formatNote(third + 1);
               const n4 = formatNote(third - 1);
-              const n5 = formatNote(third, "2"); // 4分音符
+              const n5 = formatNote(third, "2");
 
               displayMelody += `${n1.display}${n2.display} ${n3.display}${n4.display} ${n5.display} z2 | `;
               audioMelody += `${n1.audio}${n2.audio} ${n3.audio}${n4.audio} ${n5.audio} z2 | `;
@@ -542,7 +477,7 @@
             }
 
           } else {
-            // 【弦跳躍＆3連クロマチック】
+            // 【跳躍 & 3連クロマチック】
             let jump = curMidi < 65 ? curMidi + 12 : curMidi - 12;
             const n1 = formatNote(curMidi);
             const n2 = formatNote(jump);
@@ -564,6 +499,7 @@
           }
         }
 
+        // ABCヘッダー（コードネームの位置を上に引き上げ、度数との干渉を完全排除）
         let header = "X: 1\n";
         header += `T: ${currentSongTitle || "Jazz Solo Etude"}\n`;
         header += "M: 4/4\n";
@@ -571,6 +507,8 @@
         header += "K: C\n";
         header += "%%staffwidth 820\n";
         header += "%%stretchlast 1\n";
+        header += "%%gchord 28\n";       // コードネームを五線から28px上に離す
+        header += "%%annotationfont 11\n";
         setAbcString(header + displayMelody);
 
         let audioH = "X: 1\n";
@@ -608,7 +546,7 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Jazz Solo & TAB Etude</h1>
-                  <p className="text-xs text-slate-500">厳密な度数解析・開放弦完全禁止（6弦1F〜1弦20F）</p>
+                  <p className="text-xs text-slate-500">開放弦完全排除・ボックス運指・正確なコードトーン/テンション解析</p>
                 </div>
               </div>
 
@@ -718,7 +656,7 @@
                       }}
                       className="w-4 h-4 text-amber-600 rounded border-slate-300"
                     />
-                    <span>正確な度数注記（R, 3, 5, 7, b9等）を表示</span>
+                    <span>度数注記（音符の下）を表示</span>
                   </label>
                 </div>
 
