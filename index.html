@@ -55,9 +55,24 @@
        justify-content: center;
        margin: 0 4px;
        padding: 0 !important;
+       transition: all 0.15s ease-in-out !important;
     }
     .abcjs-inline-audio .abcjs-btn:hover { background-color: #e2e8f0 !important; }
     .abcjs-inline-audio .abcjs-btn svg { width: 18px !important; height: 18px !important; fill: #334155 !important; }
+
+    /* ★ループ再生ボタン等がON（pushed状態）の時の明確な色付けハイライト */
+    .abcjs-inline-audio .abcjs-btn.abcjs-pushed {
+       background-color: #2563eb !important;
+       border-color: #1d4ed8 !important;
+       color: #ffffff !important;
+       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25) !important;
+    }
+    .abcjs-inline-audio .abcjs-btn.abcjs-pushed svg {
+       fill: #ffffff !important;
+    }
+    .abcjs-inline-audio .abcjs-btn.abcjs-pushed:hover {
+       background-color: #1d4ed8 !important;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
@@ -98,7 +113,7 @@
       },
       {
         title: "Giant Steps",
-        key: "C", // ★エラー防止のためC（調号なし）で正確に臨時記号表記
+        key: "C", // 調号なし（臨時記号で正確表記）
         measures: 16,
         chords: [
           "Bmaj7 D7", "Gmaj7 Bb7", "Ebmaj7", "Am7 D7",
@@ -217,7 +232,7 @@
         }
       }, [abcjsLoaded, chords]);
 
-      // レンダリングと「4弦ベース専用4本線化 ＆ 開放弦0排除・弦移動最適化」
+      // レンダリングとTAB調整
       useEffect(() => {
         if (abcjsLoaded && abcString && window.ABCJS) {
           let tablatureOptions = [];
@@ -376,7 +391,6 @@
         const isMajor = type.includes('maj') || type.includes('M7') || type.includes('△');
         const isV7 = type.includes('7') && !isMinor && !isMajor && !isDim;
 
-        // 基本は R, 3, 5, 7 の4音のみ
         let chordIntervals = [0, isMinor ? 3 : 4, isDim ? 6 : 7, isMajor ? 11 : (type.includes('dim7') ? 9 : 10)];
 
         if (isV7) {
@@ -415,15 +429,14 @@
         }
       };
 
-      // ★小節内の臨時記号・ナチュラル管理を完全に厳密化したABC音名変換
-      // (同じ小節内で _e が出た後にまた Eb を弾く場合や、Eナチュラルに戻る場合のバグを完全解消)
+      // 小節内の臨時記号・ナチュラル管理
       const midiToAbcByKey = (midi, keySig, measureAccRef) => {
         const flatsInKey = KEY_FLATS[keySig] || [];
         const pitchClass = midi % 12;
         const octave = Math.floor(midi / 12) - 1;
 
         let baseName = "";
-        let targetState = "natural"; // "flat", "sharp", "natural"
+        let targetState = "natural";
 
         switch (pitchClass) {
           case 0:  baseName = "C"; targetState = "natural"; break;
@@ -446,7 +459,6 @@
         else if (octave === 5) abc = baseName.toLowerCase();
         else if (octave === 6) abc = baseName.toLowerCase() + "'";
 
-        // その小節のその音名・オクターブの初期状態（調号によってフラットかナチュラルか）
         const defaultState = flatsInKey.includes(baseName) ? "flat" : "natural";
         const key = baseName + octave;
         const currentState = measureAccRef[key] !== undefined ? measureAccRef[key] : defaultState;
@@ -456,7 +468,6 @@
           if (targetState === "flat") prefix = "_";
           else if (targetState === "sharp") prefix = "^";
           else if (targetState === "natural") prefix = "=";
-          // 状態を記録更新（小節の終わりまで維持される）
           measureAccRef[key] = targetState;
         }
 
@@ -480,7 +491,7 @@
         return `[${r}${t}${s}]${beats}`;
       };
 
-      // フレーズ生成エンジン
+      // ★Over-the-Barline（小節線を跨いでドライブするジャズフレージング）エンジン
       const generateEtude = () => {
         let fullLines = [];
         let audioMelody = "";
@@ -524,7 +535,7 @@
           let accV1 = {};
           let accComp = {};
 
-          // ピアノ伴奏（2コード時は前半2拍＝chord1、後半2拍＝chord2）
+          // ピアノ伴奏
           if (hasTwoChords) {
             compingStr += `${getPianoVoicing(chord1, keySig, accComp, 4)} ${getPianoVoicing(chord2, keySig, accComp, 4)} | `;
           } else {
@@ -561,6 +572,7 @@
           let half2Str = hasTwoChords ? `"${chord2}"` : "";
 
           if (m === measureCount - 1) {
+            // 曲の最後の小節だけは解決して終わる
             const n1 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
             const n2 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
             const n3 = makeNote(pickNote(pool1, prevPitch, -1), "", info1);
@@ -571,26 +583,38 @@
             const n5 = makeNote(rootTarget, "4", info2);
             half2Str += `${n5}`;
           } else {
-            // 前半（拍1〜2）
-            const pat1 = Math.floor(Math.random() * 4);
+            // =========================================================================
+            // 前半（1〜2拍目）：前小節の4拍目から飛び込んできたラインを受け止め、または休符で呼吸を作る
+            // =========================================================================
+            const pat1 = Math.floor(Math.random() * 5);
             if (pat1 === 0) {
-              const n1 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
+              // 1拍目の頭に解決して少し伸ばし（4分音符）、2拍目から再び8分で動き出す
+              const n1 = makeNote(pickNote(pool1, prevPitch, 0), "2", info1);
               const n2 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
-              const n3 = makeNote(pickNote(pool1, prevPitch, -1), "", info1);
-              half1Str += `z${n1} ${n2}${n3} `;
+              const n3 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
+              half1Str += `${n1} ${n2}${n3} `;
             } else if (pat1 === 1) {
+              // 1拍目頭を着地させた後、1拍目裏〜2拍目頭を休んで2拍目裏からピックアップ
+              const n1 = makeNote(pickNote(pool1, prevPitch, -1), "", info1);
+              const n2 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
+              half1Str += `${n1}z z${n2} `;
+            } else if (pat1 === 2) {
+              // 1拍目8分休符（裏拍入り）＋ 2拍目3連符ターン
+              const n1 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
+              const t1 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
+              const t2 = makeNote(pickNote(pool1, prevPitch, -1), "", info1);
+              const t3 = makeNote(pickNote(pool1, prevPitch, -1), "", info1);
+              half1Str += `z${n1} (3${t1}${t2}${t3} `;
+            } else if (pat1 === 3) {
+              // 1拍目8分2個 ＋ 2拍目3連符
               const n1 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
               const n2 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
               const t1 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
               const t2 = makeNote(pickNote(pool1, prevPitch, -1), "", info1);
               const t3 = makeNote(pickNote(pool1, prevPitch, -1), "", info1);
               half1Str += `${n1}${n2} (3${t1}${t2}${t3} `;
-            } else if (pat1 === 2) {
-              const n1 = makeNote(pickNote(pool1, prevPitch, 0), "2", info1);
-              const n2 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
-              const n3 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
-              half1Str += `${n1} ${n2}${n3} `;
             } else {
+              // 駆け上がるスウィング8分ライン
               const n1 = makeNote(pickNote(pool1, prevPitch, -1), "", info1);
               const n2 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
               const n3 = makeNote(pickNote(pool1, prevPitch, 1), "", info1);
@@ -598,28 +622,45 @@
               half1Str += `${n1}${n2} ${n3}${n4} `;
             }
 
-            // 後半（拍3〜4）
-            const pat2 = Math.floor(Math.random() * 4);
+            // =========================================================================
+            // 後半（3〜4拍目）：★4拍目に4分音符や休符を絶対に置かず、必ず小節線を跨いで次小節へドライブさせる！
+            // =========================================================================
+            const pat2 = Math.floor(Math.random() * 5);
             if (pat2 === 0) {
+              // 3拍目〜4拍目裏までノンストップの8分ビバップライン（次の小節の頭へ直結）
+              const n1 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
+              const n2 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
+              const n3 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
+              const n4 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
+              half2Str += `${n1}${n2} ${n3}${n4}`;
+            } else if (pat2 === 1) {
+              // 3拍目3連符 ＋ 4拍目8分音符2個で小節線を跨ぐ
               const t1 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
               const t2 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
               const t3 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
-              const n4 = makeNote(pickNote(pool2, prevPitch, -1), "2", info2);
-              half2Str += `(3${t1}${t2}${t3} ${n4}`;
-            } else if (pat2 === 1) {
+              const n4 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
+              const n5 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
+              half2Str += `(3${t1}${t2}${t3} ${n4}${n5}`;
+            } else if (pat2 === 2) {
+              // 3拍目8分2個 ＋ 4拍目に3連符を置いて勢いよく小節線を飛び越える
+              const n1 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
+              const n2 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
+              const t1 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
+              const t2 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
+              const t3 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
+              half2Str += `${n1}${n2} (3${t1}${t2}${t3}`;
+            } else if (pat2 === 3) {
+              // 3拍目で一旦4分音符を置き、4拍目の8分2個（ピックアップ）で次の小節へ仕掛け直す
               const n1 = makeNote(pickNote(pool2, prevPitch, -1), "2", info2);
               const n2 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
-              half2Str += `${n1} z${n2}`;
-            } else if (pat2 === 2) {
-              const n1 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
-              const n2 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
-              const n3 = makeNote(pickNote(pool2, prevPitch, -1), "2", info2);
-              half2Str += `${n1}${n2} ${n3}`;
-            } else {
-              const n1 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
-              const n2 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
               const n3 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
-              half2Str += `${n1}${n2} ${n3}z`;
+              half2Str += `${n1} ${n2}${n3}`;
+            } else {
+              // 3拍目頭8分休符（ブレス）＋ 3拍目裏〜4拍目裏まで3連続8分音符で小節線を越える
+              const n1 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
+              const n2 = makeNote(pickNote(pool2, prevPitch, 1), "", info2);
+              const n3 = makeNote(pickNote(pool2, prevPitch, -1), "", info2);
+              half2Str += `z${n1} ${n2}${n3}`;
             }
           }
 
@@ -698,7 +739,7 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Jazz Chord Tone Solo & TAB</h1>
-                  <p className="text-xs text-slate-500">Giant Steps (Key:C) 修正・Blue Bossa / St. Thomas 収録・開放弦ゼロ・ピアノ伴奏のみ</p>
+                  <p className="text-xs text-slate-500">Over-the-Barline（小節線越え）フレージング・ループボタン色分け・開放弦ゼロ</p>
                 </div>
               </div>
 
