@@ -3,597 +3,361 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Standard Chord Tone Solo Trainer</title>
+  <title>Jazz Standard Solo Trainer & Etude Generator</title>
+  
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React 18 & Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  
+  <!-- ABCJS for standard notation and audio synth -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-audio.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-basic-min.js"></script>
+
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            jazz: {
-              950: '#080a0f',
-              900: '#0e1117',
-              850: '#141822',
-              800: '#1a202c',
-              700: '#283142',
-              gold: '#f59e0b',
-              amber: '#d97706',
-              cyan: '#38bdf8'
-            }
-          },
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            display: ['Cinzel', 'serif'],
-            mono: ['JetBrains Mono', 'monospace']
-          }
-        }
-      }
-    }
-  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
   <style>
-    /* Custom Scrollbars */
-    ::-webkit-scrollbar {
-      height: 7px;
-      width: 7px;
+    body {
+      font-family: 'Inter', sans-serif;
     }
-    ::-webkit-scrollbar-track {
-      background: #0e1117;
+    .font-display {
+      font-family: 'Cinzel', serif;
     }
-    ::-webkit-scrollbar-thumb {
-      background: #283142;
-      border-radius: 4px;
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
     }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #f59e0b;
+
+    .abcjs-css-warning { display: none !important; }
+    .abcjs-note { fill: #1e293b; }
+    .abcjs-staff { stroke: #64748b; fill: #64748b; }
+    .abcjs-highlight { fill: #2563eb !important; stroke: #2563eb !important; }
+    .abcjs-tempo { display: none !important; }
+    
+    #paper {
+      padding-bottom: 20px;
     }
-    .glass-card {
-      background: rgba(14, 17, 23, 0.88);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+    #paper svg { 
+      overflow: visible !important; 
+      width: 100% !important;
+      height: auto !important;
     }
+
+    /* ABCJS audio controller restyling for light theme */
+    .abcjs-inline-audio {
+      margin: 0;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+    .abcjs-inline-audio .abcjs-btn {
+      background-color: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 8px !important;
+      color: #334155 !important;
+      width: 38px !important;
+      height: 38px !important;
+      cursor: pointer;
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+      margin: 0 4px;
+      padding: 0 !important;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: all 0.15s ease;
+    }
+    .abcjs-inline-audio .abcjs-btn:hover {
+      background-color: #f1f5f9 !important;
+      border-color: #94a3b8 !important;
+    }
+    .abcjs-inline-audio .abcjs-btn svg {
+      width: 18px !important;
+      height: 18px !important;
+      fill: #2563eb !important;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
-<body class="bg-jazz-950 text-gray-200 font-sans min-h-screen flex flex-col selection:bg-jazz-gold selection:text-black">
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <div id="root"></div>
 
-  <!-- Header -->
-  <header class="border-b border-jazz-800 bg-jazz-900/95 sticky top-0 z-50 px-4 py-3 sm:px-6">
-    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-900/30">
-          <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white font-display flex items-center gap-2">
-            Jazz Solo Lab <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-sans font-medium">Chord Tone Focus</span>
-          </h1>
-          <p class="text-xs text-gray-400">モダン・ビバップ・スウィング &amp; ボイスリーディング・エチュード</p>
-        </div>
-      </div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
 
-      <!-- Quick Playback Controls -->
-      <div class="flex items-center gap-3">
-        <button id="btnPlay" class="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-amber-500/25 transition active:scale-95">
-          <svg id="playIcon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          <span id="playLabel">再生</span>
-        </button>
-        <button id="btnRegen" class="flex items-center gap-1.5 bg-jazz-800 hover:bg-jazz-700 text-gray-200 font-medium px-4 py-2.5 rounded-xl border border-jazz-700 transition active:scale-95" title="新しいソロフレーズを生成">
-          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          <span class="text-sm hidden sm:inline">フレーズ生成</span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Container -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-6">
-
-    <!-- Configuration Panels -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-
-      <!-- Standard & Dominant Setup -->
-      <div class="lg:col-span-8 glass-card p-4 sm:p-5 rounded-2xl shadow-xl space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <!-- Standard Progression Selection -->
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-amber-400 mb-1.5">
-              スタンダード進行
-            </label>
-            <select id="progressionSelect" class="w-full bg-jazz-850 border border-jazz-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-amber-400">
-              <option value="autumn">Autumn Leaves (枯葉 / G min - Bb Maj)</option>
-              <option value="bluebossa">Blue Bossa (C min - Db Maj)</option>
-              <option value="solar">Solar (Miles Davis / C min Blues/Modal)</option>
-              <option value="jazzblues">Bb Jazz Blues (12 Bar)</option>
-              <option value="flyme">Fly Me to the Moon (C / Am)</option>
-              <option value="allthethings">All The Things You Are (前半8小節)</option>
-            </select>
-          </div>
-
-          <!-- Dominant 7th Approach (The main feature requested) -->
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-amber-400 mb-1.5 flex items-center justify-between">
-              <span>ドミナント7thのアプローチ</span>
-              <span class="text-[10px] text-gray-400 font-normal">V7コードに適用</span>
-            </label>
-            <select id="dominantApproachSelect" class="w-full bg-jazz-850 border border-amber-500/40 rounded-lg px-3 py-2 text-sm text-amber-200 font-medium focus:outline-none focus:border-amber-400">
-              <option value="chordTone">コードトーン重視 (Root, 3, 5, b7, 9, 13)</option>
-              <option value="altered">オルタード・スケール (b9, #9, 3, #11, b13, b7)</option>
-              <option value="condim">コンディミ / H-W Diminished (1, b9, #9, 3, #11, 5, 13)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Solo Density & Style -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-jazz-800">
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">フレーズ密度</label>
-            <select id="densitySelect" class="w-full bg-jazz-850 border border-jazz-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
-              <option value="dense">ビバップ密度 (連続8分音符ライン)</option>
-              <option value="moderate" selected>標準 (8分音符 + 自然な休符)</option>
-              <option value="sparse">ゆったり (4分音符・ガイドトーン主)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">ターゲット音の着地</label>
-            <select id="targetFocusSelect" class="w-full bg-jazz-850 border border-jazz-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
-              <option value="3rd7th" selected>3度・7度重視 (ガイドトーン連結)</option>
-              <option value="triad">ルート・5度重視 (アルペジオ型)</option>
-              <option value="tensions">テンション指向 (9th, 11th, 13th)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">アプローチ手法</label>
-            <select id="approachTypeSelect" class="w-full bg-jazz-850 border border-jazz-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
-              <option value="chromatic" selected>半音クロマチック・アプローチ</option>
-              <option value="enclosure">エンクロージャー (挟み込み)</option>
-              <option value="diatonic">スケール・ステップ (全音/半音)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Audio & Instrument Settings -->
-      <div class="lg:col-span-4 glass-card p-4 sm:p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-4">
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">テンポ (BPM)</span>
-            <span id="bpmVal" class="text-sm font-mono font-bold text-amber-400">130 BPM</span>
-          </div>
-          <input type="range" id="bpmSlider" min="80" max="220" value="130" class="w-full accent-amber-500 cursor-pointer">
-          <div class="flex justify-between text-[10px] text-gray-500 mt-0.5 font-mono">
-            <span>80 (Ballad)</span>
-            <span>130 (Medium Swing)</span>
-            <span>220 (Up)</span>
-          </div>
-        </div>
-
-        <!-- TAB Mode Selector -->
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-amber-400 mb-1.5">
-            タブ譜の表示切替
-          </label>
-          <div class="grid grid-cols-3 gap-1 bg-jazz-850 p-1 rounded-lg border border-jazz-700">
-            <button type="button" data-tab-mode="none" class="tab-mode-btn py-1.5 px-2 text-xs rounded text-gray-300 font-medium hover:text-white transition">五線譜のみ</button>
-            <button type="button" data-tab-mode="guitar" class="tab-mode-btn active py-1.5 px-2 text-xs rounded bg-amber-500 text-black font-bold transition">ギター TAB</button>
-            <button type="button" data-tab-mode="bass" class="tab-mode-btn py-1.5 px-2 text-xs rounded text-gray-300 font-medium hover:text-white transition">ベース TAB</button>
-          </div>
-          <p id="tabNotice" class="text-[11px] text-gray-400 mt-1.5 leading-snug">
-            ※ ギターTAB (6弦・EADGBE) を表示中。
-          </p>
-        </div>
-
-        <!-- Sound Balance -->
-        <div class="pt-2 border-t border-jazz-800 flex items-center justify-between text-xs text-gray-300">
-          <label class="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" id="soloMute" class="accent-amber-500 rounded">
-            <span>ソロ消音 (マイナスワン)</span>
-          </label>
-          <div class="text-[11px] text-amber-400/90 font-mono flex items-center gap-1">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Legato Jazz Swing</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Active Chord Progression Strip -->
-    <div class="glass-card p-3 rounded-xl flex items-center gap-2 overflow-x-auto shadow-md">
-      <div class="text-xs font-mono uppercase text-gray-400 px-2 py-1 bg-jazz-850 rounded shrink-0">Progressions:</div>
-      <div id="chordStrip" class="flex items-center gap-2 text-sm font-bold font-mono">
-        <!-- Injected via JS -->
-      </div>
-    </div>
-
-    <!-- Sheet Music & TAB Display Area -->
-    <div class="glass-card rounded-2xl p-4 sm:p-6 shadow-2xl relative">
-      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div class="flex items-center gap-3">
-          <h2 class="text-base sm:text-lg font-bold font-display text-white tracking-wide">
-            Interactive Score &amp; TAB
-          </h2>
-          <span id="activeScaleBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
-            V7 Approach: Pure Chord Tones &amp; Guide Tones
-          </span>
-        </div>
-        <div class="flex items-center gap-3 text-xs text-gray-300">
-          <span class="flex items-center gap-1.5">
-            <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-            <span>コードトーン (R, 3, 5, 7)</span>
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span class="inline-block w-2.5 h-2.5 rounded-full bg-sky-400"></span>
-            <span>テンション/オルタード/経過音</span>
-          </span>
-        </div>
-      </div>
-
-      <!-- Notation Render Container -->
-      <div id="notationWrapper" class="overflow-x-auto bg-jazz-900/90 rounded-xl p-3 sm:p-5 border border-jazz-800 relative min-h-[220px]">
-        <svg id="scoreSvg" class="w-full h-auto min-w-[920px] overflow-visible" xmlns="http://www.w3.org/2000/svg">
-          <!-- Rendered dynamically -->
-        </svg>
-      </div>
-    </div>
-
-    <!-- Interactive Fretboard Visualizer -->
-    <div class="glass-card rounded-2xl p-4 sm:p-5 shadow-xl">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-bold font-display text-amber-400">Fretboard Position Monitor</span>
-          <span id="fretboardInstrumentBadge" class="text-[11px] text-gray-400 font-mono">(Guitar 22 Frets / EADGBE)</span>
-        </div>
-        <div id="fretboardChordIndicator" class="text-sm font-mono text-amber-300 font-bold">
-          Now: <span id="currentFretChord" class="text-white">--</span>
-        </div>
-      </div>
-      <div class="overflow-x-auto pb-2">
-        <div id="fretboardContainer" class="min-w-[840px] h-32 bg-jazz-950 border border-jazz-800 rounded-lg relative flex flex-col justify-between p-3 select-none">
-          <!-- Dynamic fretboard strings and frets rendered here -->
-        </div>
-      </div>
-    </div>
-
-  </main>
-
-  <footer class="border-t border-jazz-800/80 py-4 text-center text-xs text-gray-500">
-    Jazz Standard Chord Tone Solo Trainer &bull; Modern Web Audio Synthesizer &amp; Beamed SVG Tablature
-  </footer>
-
-  <!-- App Script -->
-  <script>
-    /* ==========================================================================
-       Jazz Solo Trainer Engine
-       ========================================================================== */
-
-    const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-    
-    function midiToFreq(midi) {
-      return 440 * Math.pow(2, (midi - 69) / 12);
-    }
-    
-    function midiToName(midi) {
-      const note = NOTE_NAMES[midi % 12];
-      const oct = Math.floor(midi / 12) - 1;
-      return note + oct;
-    }
-
-    // --- Standard Progressions ---
-    const PROGRESSIONS = {
-      autumn: {
-        name: "Autumn Leaves",
-        key: "G minor",
-        bars: [
-          { chord: "Cm7",    root: 0,  type: "m7",   dominant: false },
-          { chord: "F7",     root: 5,  type: "7",    dominant: true,  targetNext: 10 },
-          { chord: "Bbmaj7", root: 10, type: "maj7", dominant: false },
-          { chord: "Ebmaj7", root: 3,  type: "maj7", dominant: false },
-          { chord: "Am7b5",  root: 9,  type: "m7b5", dominant: false },
-          { chord: "D7b9",   root: 2,  type: "7",    dominant: true,  targetNext: 7 },
-          { chord: "Gm7",    root: 7,  type: "m7",   dominant: false },
-          { chord: "Gm7",    root: 7,  type: "m7",   dominant: false }
-        ]
-      },
-      bluebossa: {
-        name: "Blue Bossa",
-        key: "C minor",
-        bars: [
-          { chord: "Cm7",    root: 0,  type: "m7",   dominant: false },
-          { chord: "Cm7",    root: 0,  type: "m7",   dominant: false },
-          { chord: "Fm7",    root: 5,  type: "m7",   dominant: false },
-          { chord: "Bb7",    root: 10, type: "7",    dominant: true,  targetNext: 3 },
-          { chord: "Ebm7",   root: 3,  type: "m7",   dominant: false },
-          { chord: "Ab7",    root: 8,  type: "7",    dominant: true,  targetNext: 1 },
-          { chord: "Dbmaj7", root: 1,  type: "maj7", dominant: false },
-          { chord: "Dm7b5",  root: 2,  type: "m7b5", dominant: false }
-        ]
-      },
-      solar: {
-        name: "Solar",
-        key: "C minor",
-        bars: [
-          { chord: "Cm7",    root: 0,  type: "m7",   dominant: false },
-          { chord: "Cm7",    root: 0,  type: "m7",   dominant: false },
-          { chord: "Gm7",    root: 7,  type: "m7",   dominant: false },
-          { chord: "C7",     root: 0,  type: "7",    dominant: true,  targetNext: 5 },
-          { chord: "Fmaj7",  root: 5,  type: "maj7", dominant: false },
-          { chord: "Fm7",    root: 5,  type: "m7",   dominant: false },
-          { chord: "Bb7",    root: 10, type: "7",    dominant: true,  targetNext: 3 },
-          { chord: "Ebmaj7", root: 3,  type: "maj7", dominant: false }
-        ]
-      },
-      jazzblues: {
-        name: "Bb Jazz Blues",
-        key: "Bb",
-        bars: [
-          { chord: "Bb7",    root: 10, type: "7",    dominant: true },
-          { chord: "Eb7",    root: 3,  type: "7",    dominant: true },
-          { chord: "Bb7",    root: 10, type: "7",    dominant: true },
-          { chord: "Fm7",    root: 5,  type: "m7",   dominant: false },
-          { chord: "Eb7",    root: 3,  type: "7",    dominant: true },
-          { chord: "Edim7",  root: 4,  type: "dim7", dominant: false },
-          { chord: "Bb7",    root: 10, type: "7",    dominant: true },
-          { chord: "G7b9",   root: 7,  type: "7",    dominant: true }
-        ]
-      },
-      flyme: {
-        name: "Fly Me to the Moon",
-        key: "C Major",
-        bars: [
-          { chord: "Am7",    root: 9,  type: "m7",   dominant: false },
-          { chord: "Dm7",    root: 2,  type: "m7",   dominant: false },
-          { chord: "G7",     root: 7,  type: "7",    dominant: true,  targetNext: 0 },
-          { chord: "Cmaj7",  root: 0,  type: "maj7", dominant: false },
-          { chord: "Fmaj7",  root: 5,  type: "maj7", dominant: false },
-          { chord: "Bm7b5",  root: 11, type: "m7b5", dominant: false },
-          { chord: "E7b9",   root: 4,  type: "7",    dominant: true,  targetNext: 9 },
-          { chord: "Am7",    root: 9,  type: "m7",   dominant: false }
-        ]
-      },
-      allthethings: {
-        name: "All The Things You Are",
+    // --- Complete Jazz Standards (Full Length Tunes) ---
+    const STANDARD_SONGS = [
+      {
+        title: "All The Things You Are",
+        measures: 36,
         key: "Ab",
-        bars: [
-          { chord: "Fm7",    root: 5,  type: "m7",   dominant: false },
-          { chord: "Bbm7",   root: 10, type: "m7",   dominant: false },
-          { chord: "Eb7",    root: 3,  type: "7",    dominant: true,  targetNext: 8 },
-          { chord: "Abmaj7", root: 8,  type: "maj7", dominant: false },
-          { chord: "Dbmaj7", root: 1,  type: "maj7", dominant: false },
-          { chord: "Dm7",    root: 2,  type: "m7",   dominant: false },
-          { chord: "G7",     root: 7,  type: "7",    dominant: true,  targetNext: 0 },
-          { chord: "Cmaj7",  root: 0,  type: "maj7", dominant: false }
+        chords: [
+          "Fm7", "Bbm7", "Eb7", "Abmaj7", "Dbmaj7", "G7", "Cmaj7", "Cmaj7",
+          "Cm7", "Fm7", "Bb7", "Ebmaj7", "Abmaj7", "D7", "Gmaj7", "Gmaj7",
+          "Am7", "D7", "Gmaj7", "Gmaj7", "F#m7b5", "B7", "Emaj7", "C7alt",
+          "Fm7", "Bbm7", "Eb7", "Abmaj7", "Dbmaj7", "Dbm7", "Cm7", "Bdim7",
+          "Bbm7", "Eb7", "Abmaj7", "Abmaj7"
+        ]
+      },
+      {
+        title: "Autumn Leaves",
+        measures: 32,
+        key: "G minor",
+        chords: [
+          "Cm7", "F7", "Bbmaj7", "Ebmaj7", "Am7b5", "D7", "Gm7", "Gm7",
+          "Cm7", "F7", "Bbmaj7", "Ebmaj7", "Am7b5", "D7", "Gm7", "Gm7",
+          "Am7b5", "D7", "Gm7", "Gm7", "Cm7", "F7", "Bbmaj7", "Ebmaj7",
+          "Am7b5", "D7", "Gm7 C7", "Fm7 Bb7", "Ebmaj7", "Am7b5 D7", "Gm7", "Gm7"
+        ]
+      },
+      {
+        title: "Blue Bossa",
+        measures: 16,
+        key: "C minor",
+        chords: [
+          "Cm7", "Cm7", "Fm7", "Fm7", "Dm7b5", "G7", "Cm7", "Cm7",
+          "Ebm7", "Ab7", "Dbmaj7", "Dbmaj7", "Dm7b5", "G7", "Cm7", "Cm7"
+        ]
+      },
+      {
+        title: "Donna Lee",
+        measures: 32,
+        key: "Ab",
+        chords: [
+          "Abmaj7", "F7", "Bbm7", "Bbm7", "Bb7", "Bb7", "Bbm7", "Eb7",
+          "Abmaj7", "F7", "Bbm7", "Bbm7", "C7", "C7", "Fm7", "C7",
+          "Fm7", "C7", "Fm7", "Fm7", "Bb7", "Bb7", "Bbm7", "Eb7",
+          "Abmaj7", "F7", "Bbm7", "Bbm7", "Abmaj7 F7", "Bbm7 Eb7", "Abmaj7", "Abmaj7"
+        ]
+      },
+      {
+        title: "Stella by Starlight",
+        measures: 32,
+        key: "Bb",
+        chords: [
+          "Em7b5", "A7", "Cm7", "F7", "Fm7", "Bb7", "Ebmaj7", "Ebmaj7",
+          "Ab7", "Ab7", "Bbmaj7", "Bbmaj7", "Em7b5", "A7", "Dm7", "Dm7",
+          "Bbm7", "Eb7", "Fmaj7", "Fmaj7", "Em7b5", "A7", "Am7b5", "D7",
+          "G7", "G7", "Cm7", "Cm7", "Ab7", "Ab7", "Bbmaj7", "Bbmaj7"
+        ]
+      },
+      {
+        title: "There Will Never Be Another You",
+        measures: 32,
+        key: "Eb",
+        chords: [
+          "Ebmaj7", "Ebmaj7", "Dm7b5", "G7", "Cm7", "Cm7", "Bbm7", "Eb7",
+          "Abmaj7", "Abmaj7", "Ebmaj7", "Ebmaj7", "F7", "F7", "Fm7", "Bb7",
+          "Ebmaj7", "Ebmaj7", "Dm7b5", "G7", "Cm7", "Cm7", "Bbm7", "Eb7",
+          "Abmaj7", "Db7", "Ebmaj7 C7", "Fm7 Bb7", "Ebmaj7", "Fm7", "Bb7", "Bb7"
+        ]
+      },
+      {
+        title: "What Is This Thing Called Love?",
+        measures: 32,
+        key: "C",
+        chords: [
+          "Gm7b5", "C7", "Fm7", "Fm7", "Dm7b5", "G7", "Cmaj7", "Cmaj7",
+          "Gm7b5", "C7", "Fm7", "Fm7", "Dm7b5", "G7", "Cmaj7", "Cmaj7",
+          "C7", "C7", "Fmaj7", "Fmaj7", "D7", "D7", "G7", "G7",
+          "Gm7b5", "C7", "Fm7", "Fm7", "Dm7b5", "G7", "Cmaj7", "Cmaj7"
+        ]
+      },
+      {
+        title: "You'd Be So Nice To Come Home To",
+        measures: 32,
+        key: "A minor",
+        chords: [
+          "Am7", "Am7", "Bm7b5", "E7", "Am7", "Am7", "Bm7b5", "E7",
+          "Am7", "A7", "Dm7", "Dm7", "D7", "D7", "G7", "E7",
+          "Am7", "Am7", "Bm7b5", "E7", "Am7", "Am7", "Bm7b5", "E7",
+          "Fmaj7", "Fm7", "Am7", "D7", "Bm7b5", "E7", "Am7", "Am7"
+        ]
+      },
+      {
+        title: "Bb Jazz Blues",
+        measures: 12,
+        key: "Bb",
+        chords: [
+          "Bb7", "Eb7", "Bb7", "Fm7 Bb7",
+          "Eb7", "Edim7", "Bb7", "G7",
+          "Cm7", "F7", "Bb7 G7", "Cm7 F7"
+        ]
+      },
+      {
+        title: "F Jazz Blues",
+        measures: 12,
+        key: "F",
+        chords: [
+          "F7", "Bb7", "F7", "Cm7 F7",
+          "Bb7", "Bdim7", "F7", "D7",
+          "Gm7", "C7", "F7 D7", "Gm7 C7"
+        ]
+      },
+      {
+        title: "Giant Steps",
+        measures: 16,
+        key: "B",
+        chords: [
+          "Bmaj7 D7", "Gmaj7 Bb7", "Ebmaj7", "Am7 D7",
+          "Gmaj7 Bb7", "Ebmaj7 F#7", "Bmaj7", "Fm7 Bb7",
+          "Ebmaj7", "Am7 D7", "Gmaj7", "C#m7 F#7",
+          "Bmaj7", "Fm7 Bb7", "Ebmaj7", "C#m7 F#7"
+        ]
+      },
+      {
+        title: "Standard II-V-I (Major & Minor)",
+        measures: 8,
+        key: "C / A min",
+        chords: [
+          "Dm7", "G7", "Cmaj7", "Cmaj7",
+          "Bm7b5", "E7", "Am7", "Am7"
         ]
       }
-    };
+    ];
 
-    // --- State Management ---
-    const state = {
-      progressionKey: "autumn",
-      dominantApproach: "chordTone", // 'chordTone', 'altered', 'condim'
-      tabMode: "guitar",             // 'none', 'guitar', 'bass'
-      bpm: 130,
-      density: "moderate",
-      targetFocus: "3rd7th",
-      approachType: "chromatic",
-      isPlaying: false,
-      currentStep: 0,
-      totalSteps: 0,
-      soloMute: false,
-      generatedSolo: []              // List of 8th note steps
-    };
+    // --- Music Theory Engine ---
+    const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const GUITAR_TUNING = [64, 59, 55, 50, 45, 40]; // E4, B3, G3, D3, A2, E2 (strings 1 to 6)
+    const BASS_TUNING = [43, 38, 33, 28]; // G2, D2, A1, E1 (strings 1 to 4)
 
-    // Tunings
-    const GUITAR_TUNING = [64, 59, 55, 50, 45, 40]; // E4, B3, G3, D3, A2, E2
-    const GUITAR_NAMES  = ["E4", "B3", "G3", "D3", "A2", "E2"];
-    const BASS_TUNING   = [43, 38, 33, 28]; // G2, D2, A1, E1
-    const BASS_NAMES    = ["G2", "D2", "A1", "E1"];
-
-    /* ==========================================================================
-       Theory Engine: Scales & Chord Tones
-       ========================================================================== */
-
-    function getChordTones(root, type) {
-      switch(type) {
-        case "maj7":
-          return [0, 4, 7, 11, 14]; // R, 3, 5, 7, 9
-        case "m7":
-          return [0, 3, 7, 10, 14]; // R, b3, 5, b7, 9
-        case "7":
-          return [0, 4, 7, 10, 14, 21]; // R, 3, 5, b7, 9, 13
-        case "m7b5":
-          return [0, 3, 6, 10, 13]; // R, b3, b5, b7, 11
-        case "dim7":
-          return [0, 3, 6, 9];
-        default:
-          return [0, 4, 7, 10];
-      }
+    function getMidiOffset(noteStr) {
+      const map = {
+        'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
+        'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8,
+        'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+      };
+      return map[noteStr] || 0;
     }
 
-    function getScaleForDominant(root, approach) {
-      if (approach === "altered") {
-        return {
-          intervals: [0, 1, 3, 4, 6, 8, 10], // 1, b9, #9, 3, #11, b13, b7
-          guideTones: [4, 10],
-          colorTones: [1, 3, 6, 8]
-        };
-      } else if (approach === "condim") {
-        return {
-          intervals: [0, 1, 3, 4, 6, 7, 9, 10], // 1, b9, #9, 3, #11, 5, 13, b7
-          guideTones: [4, 10],
-          colorTones: [1, 3, 6, 9]
-        };
+    function isDominantChord(chordStr) {
+      if (!chordStr) return false;
+      const match = chordStr.match(/^[A-G][#b]?/);
+      if (!match) return false;
+      const type = chordStr.substring(match[0].length);
+      return (type.includes('7') || type.includes('9') || type.includes('13') || type.includes('alt')) &&
+             !type.includes('maj') && !type.includes('M7') && !type.includes('m') && !type.includes('dim');
+    }
+
+    // Dominant 7th Scale Formulas
+    function getDominantApproachTones(rootMidi, strategy) {
+      if (strategy === "altered") {
+        // Altered: 1, b9, #9, 3, #11, b13, b7
+        return [0, 1, 3, 4, 6, 8, 10].map(i => rootMidi + i);
+      } else if (strategy === "condim") {
+        // Half-Whole Diminished: 1, b9, #9, 3, #11, 5, 13, b7
+        return [0, 1, 3, 4, 6, 7, 9, 10].map(i => rootMidi + i);
       } else {
-        return {
-          intervals: [0, 4, 7, 10, 14, 21],
-          guideTones: [4, 10],
-          colorTones: [14 % 12, 21 % 12]
-        };
+        // Pure Chord tones + Guide tones (R, 3, 5, b7, 9, 13)
+        return [0, 2, 4, 7, 10, 14, 21].map(i => rootMidi + (i % 12));
       }
     }
 
-    function generateSoloPhrase() {
-      const prog = PROGRESSIONS[state.progressionKey];
-      const bars = prog.bars;
-      const solo = [];
-      const stepsPerBar = 8;
-      state.totalSteps = bars.length * stepsPerBar;
+    function getChordTones(chordStr) {
+      if (!chordStr) return [0, 4, 7, 11].map(i => 60 + i);
+      const match = chordStr.match(/^[A-G][#b]?/);
+      if (!match) return [0, 4, 7, 11].map(i => 60 + i);
 
-      let currentMidi = 65; // F4 register anchor
+      let root = match[0];
+      let rootMidi = 60 + getMidiOffset(root);
+      let type = chordStr.substring(root.length);
 
-      bars.forEach((bar, bIdx) => {
-        const root = bar.root;
-        const isDom = bar.dominant;
-        const domApproach = state.dominantApproach;
+      let intervals = [0, 4, 7, 10]; // default dom7
 
-        let availableScale;
-        let guideTones = [];
-        let chordTones = [];
+      if (type.includes('maj7') || type.includes('M7') || type.includes('△7')) {
+        intervals = [0, 4, 7, 11];
+      } else if (type.includes('m7b5') || type.includes('h')) {
+        intervals = [0, 3, 6, 10];
+      } else if (type.includes('dim')) {
+        intervals = [0, 3, 6, 9];
+      } else if (type.includes('mM7') || type.includes('m#7')) {
+        intervals = [0, 3, 7, 11];
+      } else if (type.includes('m7') || type.includes('-7')) {
+        intervals = [0, 3, 7, 10];
+      } else if (type.includes('m') || type.includes('-')) {
+        intervals = [0, 3, 7];
+      } else if (type.includes('aug')) {
+        intervals = [0, 4, 8];
+      }
 
-        if (isDom && domApproach !== "chordTone") {
-          const domSpec = getScaleForDominant(root, domApproach);
-          availableScale = domSpec.intervals;
-          guideTones = domSpec.guideTones;
-          chordTones = [0, 4, 7, 10];
-        } else {
-          chordTones = getChordTones(root, bar.type);
-          availableScale = chordTones;
-          guideTones = (bar.type === "maj7" || bar.type === "m7" || bar.type === "7" || bar.type === "m7b5")
-            ? [(bar.type.startsWith("m") ? 3 : 4), (bar.type === "maj7" ? 11 : 10)]
-            : [0, 7];
-        }
+      return intervals.map(i => rootMidi + i);
+    }
 
-        function findNearest(pc, target) {
-          let candidates = [];
-          for (let oct = 4; oct <= 6; oct++) {
-            candidates.push(oct * 12 + pc);
+    // Convert MIDI pitch to ABC notation note
+    function getAbcNote(midi, measureAccidentalsRef, currentChord) {
+      let isFlatKey = false;
+      if (currentChord) {
+        const match = currentChord.match(/^[A-G][#b]?/);
+        if (match) {
+          const root = match[0];
+          const flatRoots = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'];
+          if (flatRoots.includes(root) || (currentChord.includes('m') && ['C', 'G', 'D', 'F'].includes(root))) {
+            isFlatKey = true;
           }
-          candidates.sort((a, b) => Math.abs(a - target) - Math.abs(b - target));
-          return candidates[0];
-        }
-
-        // Generate 8 steps (4 beats x 2 eighths)
-        for (let s = 0; s < stepsPerBar; s++) {
-          const isDownbeat = (s % 2 === 0);
-          const isStrongTargetBeat = (s === 0 || s === 4); // Beat 1 or 3
-
-          // Density gating
-          let isRest = false;
-          if (state.density === "sparse") {
-            if (s % 2 === 1 && Math.random() > 0.25) isRest = true;
-            if ((s === 2 || s === 6) && Math.random() > 0.5) isRest = true;
-          } else if (state.density === "moderate") {
-            if (s === 7 && Math.random() > 0.4) isRest = true; // breathe at end of measure
-            if (s === 3 && Math.random() > 0.55) isRest = true;
-          }
-
-          if (isRest) {
-            solo.push({
-              rest: true,
-              midi: null,
-              barIndex: bIdx,
-              stepInBar: s,
-              chord: bar.chord,
-              isChordTone: false,
-              label: ""
-            });
-            continue;
-          }
-
-          let pitch;
-          let isCT = false;
-          let label = "";
-
-          if (isStrongTargetBeat) {
-            // Target Tone landing
-            let targetPc;
-            if (state.targetFocus === "3rd7th" && guideTones.length > 0) {
-              targetPc = (root + guideTones[Math.floor(Math.random() * guideTones.length)]) % 12;
-              label = (targetPc === (root + 3) % 12 || targetPc === (root + 4) % 12) ? "3rd" : "7th";
-            } else if (state.targetFocus === "tensions" && isDom) {
-              const col = domApproach === "altered" ? [1, 3, 6, 8] : [1, 3, 6, 9];
-              targetPc = (root + col[Math.floor(Math.random() * col.length)]) % 12;
-              label = "tns";
-            } else {
-              const ct = chordTones[Math.floor(Math.random() * Math.min(3, chordTones.length))];
-              targetPc = (root + ct) % 12;
-              label = "CT";
-            }
-            pitch = findNearest(targetPc, currentMidi);
-            isCT = true;
-          } else if (isDownbeat) {
-            // Beat 2 or 4
-            const ct = chordTones[Math.floor(Math.random() * chordTones.length)];
-            const targetPc = (root + ct) % 12;
-            pitch = findNearest(targetPc, currentMidi);
-            isCT = true;
-            label = "CT";
-          } else {
-            // Off-beat approach
-            if (state.approachType === "chromatic") {
-              const stepDir = Math.random() > 0.5 ? 1 : -1;
-              pitch = currentMidi + stepDir;
-              label = "appr";
-              isCT = false;
-            } else if (state.approachType === "enclosure") {
-              pitch = currentMidi + (s % 4 === 1 ? 1 : -1);
-              label = "encl";
-              isCT = false;
-            } else {
-              const sc = availableScale[Math.floor(Math.random() * availableScale.length)];
-              pitch = findNearest((root + sc) % 12, currentMidi);
-              isCT = chordTones.includes(sc % 12);
-              label = isDom ? "alt" : "dia";
-            }
-          }
-
-          // Keep in comfortable jazz horn/guitar range (MIDI 57 [A3] to 81 [A5])
-          if (pitch < 57) pitch += 12;
-          if (pitch > 81) pitch -= 12;
-          currentMidi = pitch;
-
-          solo.push({
-            rest: false,
-            midi: pitch,
-            barIndex: bIdx,
-            stepInBar: s,
-            chord: bar.chord,
-            isChordTone: isCT,
-            label: label
-          });
-        }
-      });
-
-      // Optional smooth ties across same pitch on weak-to-strong beats
-      for (let i = 0; i < solo.length - 1; i++) {
-        if (!solo[i].rest && !solo[i + 1].rest && solo[i].midi === solo[i + 1].midi && solo[i].stepInBar === 7) {
-          solo[i].tiedToNext = true;
-          solo[i + 1].tiedFromPrev = true;
         }
       }
 
-      state.generatedSolo = solo;
-      renderScore();
-      updateActiveChordBadge();
+      let noteNames, defaultAccidentals;
+      if (isFlatKey) {
+        noteNames = ['C', 'D', 'D', 'E', 'E', 'F', 'G', 'G', 'A', 'A', 'B', 'B'];
+        defaultAccidentals = ['', '_', '', '_', '', '', '_', '', '_', '', '_', ''];
+      } else {
+        noteNames = ['C', 'C', 'D', 'D', 'E', 'F', 'F', 'G', 'G', 'A', 'A', 'B'];
+        defaultAccidentals = ['', '^', '', '^', '', '', '^', '', '^', '', '^', ''];
+      }
+
+      const octave = Math.floor(midi / 12) - 1;
+      const noteClass = midi % 12;
+      const baseName = noteNames[noteClass];
+      const targetAcc = defaultAccidentals[noteClass];
+
+      let abcName = baseName;
+      if (octave <= 3) {
+        for (let k = 4; k > octave; k--) abcName += ",";
+      } else if (octave === 4) {
+        abcName = baseName;
+      } else if (octave === 5) {
+        abcName = baseName.toLowerCase();
+      } else if (octave >= 6) {
+        abcName = baseName.toLowerCase();
+        for (let k = 5; k < octave; k++) abcName += "'";
+      }
+
+      const key = baseName + octave;
+      const currentAcc = measureAccidentalsRef[key] !== undefined ? measureAccidentalsRef[key] : '';
+
+      let prefix = "";
+      if (currentAcc !== targetAcc) {
+        prefix = targetAcc === '' ? '=' : targetAcc;
+        measureAccidentalsRef[key] = targetAcc;
+      }
+      return prefix + abcName;
     }
 
-    /* ==========================================================================
-       TAB Finger Position Calculator
-       ========================================================================== */
-
-    function getFretPosition(targetMidi, instrument = "guitar", preferredFret = 5) {
+    // Optimal TAB Finger Positioning (Guitar 6-string & Bass 4-string)
+    function calculateTabFret(targetMidi, instrument = "guitar", preferredFret = 5) {
       if (instrument === "guitar") {
-        const tuning = GUITAR_TUNING;
         let best = null;
         let minScore = 9999;
         for (let str = 0; str < 6; str++) {
-          const fret = targetMidi - tuning[str];
-          if (fret >= 0 && fret <= 18) {
+          const openPitch = GUITAR_TUNING[str];
+          const fret = targetMidi - openPitch;
+          if (fret >= 0 && fret <= 19) {
             const dist = Math.abs(fret - preferredFret);
-            const score = dist + (str * 0.7);
+            const score = dist + (str * 0.7); // slight preference for higher strings
             if (score < minScore) {
               minScore = score;
               best = { string: str + 1, fret: fret };
@@ -602,15 +366,15 @@
         }
         return best || { string: 1, fret: 0 };
       } else if (instrument === "bass") {
-        // 8vb transpose for bass TAB so soprano/tenor line fits on 4 strings
+        // Transpose 1 octave down (8vb, -12 semitones) strictly for TAB readability
         const bassMidi = targetMidi - 12;
-        const tuning = BASS_TUNING;
         let best = null;
         let minScore = 9999;
         for (let str = 0; str < 4; str++) {
-          const fret = bassMidi - tuning[str];
-          if (fret >= 0 && fret <= 19) {
-            const dist = Math.abs(fret - 5);
+          const openPitch = BASS_TUNING[str];
+          const fret = bassMidi - openPitch;
+          if (fret >= 0 && fret <= 20) {
+            const dist = Math.abs(fret - preferredFret);
             const score = dist + (str * 0.8);
             if (score < minScore) {
               minScore = score;
@@ -618,770 +382,831 @@
             }
           }
         }
-        return best || { string: 1, fret: Math.max(0, bassMidi - tuning[0]) };
+        return best || { string: 1, fret: Math.max(0, bassMidi - BASS_TUNING[0]) };
       }
       return null;
     }
 
-    /* ==========================================================================
-       Beamed Score & TAB Renderer (Clean Straight Beams & Uniform Stems)
-       ========================================================================== */
+    // --- Main Application Component ---
+    function App() {
+      const [measureCount, setMeasureCount] = useState(32);
+      const [bpm, setBpm] = useState(130);
+      const [chords, setChords] = useState(Array(64).fill(""));
+      const [currentSongTitle, setCurrentSongTitle] = useState("Autumn Leaves");
+      
+      // Dominant 7th Approach: 'chordTone' | 'altered' | 'condim'
+      const [dominantStrategy, setDominantStrategy] = useState("altered");
+      
+      // View Mode: 'staff' | 'guitar' | 'bass'
+      const [viewMode, setViewMode] = useState("staff");
+      
+      const [isBackingOnly, setIsBackingOnly] = useState(false);
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      
+      const [abcString, setAbcString] = useState("");
+      const [audioAbcString, setAudioAbcString] = useState("");
+      const [backingAbcString, setBackingAbcString] = useState("");
+      const [parsedSoloEvents, setParsedSoloEvents] = useState([]);
+      const [activeStepIndex, setActiveStepIndex] = useState(null);
 
-    function getDiatonicOffsetFromB4(midi) {
-      const midiB4 = 71;
-      const diatonicMap = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
-      const octDiff = Math.floor(midi / 12) - Math.floor(midiB4 / 12);
-      const semitoneInOct = midi % 12;
-      const b4Semitone = midiB4 % 12; // 11
-      const stepDiff = diatonicMap[semitoneInOct] - diatonicMap[b4Semitone];
-      return (octDiff * 7) + stepDiff;
-    }
+      const audioRef = useRef(null);
+      const synthRef = useRef(null);
 
-    function getAccidental(midi) {
-      const pc = midi % 12;
-      if ([1, 3, 6, 8, 10].includes(pc)) return "♯";
-      return null;
-    }
-
-    function renderScore() {
-      const svg = document.getElementById("scoreSvg");
-      const solo = state.generatedSolo;
-      if (!solo || solo.length === 0) return;
-
-      const prog = PROGRESSIONS[state.progressionKey];
-      const bars = prog.bars;
-      const totalBars = bars.length;
-
-      const barWidth = 190;
-      const marginX = 70;
-      const totalWidth = marginX + (totalBars * barWidth) + 30;
-
-      const trebleStaffY = 65;
-      const staffLineSpacing = 9; // 5 lines: trebleStaffY to +36px
-      const stemLength = 26;
-
-      const showTab = state.tabMode !== "none";
-      const isBass = state.tabMode === "bass";
-      const tabStringsCount = isBass ? 4 : 6;
-      const tabLineSpacing = 11;
-      const tabStaffY = trebleStaffY + 75;
-      const totalSvgHeight = showTab ? tabStaffY + ((tabStringsCount - 1) * tabLineSpacing) + 40 : trebleStaffY + 70;
-
-      svg.setAttribute("viewBox", `0 0 ${totalWidth} ${totalSvgHeight}`);
-      svg.setAttribute("width", totalWidth);
-      svg.setAttribute("height", totalSvgHeight);
-
-      let markup = `
-        <defs>
-          <linearGradient id="cursorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.05"/>
-          </linearGradient>
-        </defs>
-      `;
-
-      // 1. Clef & Time Signature Header
-      markup += `
-        <text x="14" y="${trebleStaffY + 27}" font-family="serif" font-size="32" fill="#f59e0b" font-weight="bold">𝄞</text>
-        <text x="42" y="${trebleStaffY + 16}" font-family="sans-serif" font-size="12" font-weight="bold" fill="#9ca3af">4</text>
-        <text x="42" y="${trebleStaffY + 30}" font-family="sans-serif" font-size="12" font-weight="bold" fill="#9ca3af">4</text>
-      `;
-
-      if (showTab) {
-        markup += `
-          <g fill="#94a3b8" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="bold">
-            <text x="22" y="${tabStaffY + 13}">T</text>
-            <text x="22" y="${tabStaffY + 26}">A</text>
-            <text x="22" y="${tabStaffY + 39}">B</text>
-            ${isBass ? `<text x="14" y="${tabStaffY + 52}" font-size="9" fill="#f59e0b">8vb</text>` : ''}
-          </g>
-        `;
-      }
-
-      // 2. Continuous Staff & TAB lines
-      for (let l = 0; l < 5; l++) {
-        const y = trebleStaffY + (l * staffLineSpacing);
-        markup += `<line x1="${marginX - 15}" y1="${y}" x2="${totalWidth - 15}" y2="${y}" stroke="#475569" stroke-width="1.1"/>`;
-      }
-
-      if (showTab) {
-        for (let tl = 0; tl < tabStringsCount; tl++) {
-          const ty = tabStaffY + (tl * tabLineSpacing);
-          markup += `<line x1="${marginX - 15}" y1="${ty}" x2="${totalWidth - 15}" y2="${ty}" stroke="#334155" stroke-width="1"/>`;
+      // Initialize with Autumn Leaves
+      useEffect(() => {
+        const autumn = STANDARD_SONGS.find(s => s.title === "Autumn Leaves");
+        if (autumn) {
+          selectStandardSong(autumn);
         }
-      }
+      }, []);
 
-      // 3. Bars, Chord Names, Measure Numbers
-      bars.forEach((b, i) => {
-        const bX = marginX + (i * barWidth);
-        const rightX = bX + barWidth;
-
-        // Bar line
-        markup += `<line x1="${rightX}" y1="${trebleStaffY}" x2="${rightX}" y2="${trebleStaffY + 36}" stroke="#64748b" stroke-width="1.4"/>`;
-        if (showTab) {
-          markup += `<line x1="${rightX}" y1="${tabStaffY}" x2="${rightX}" y2="${tabStaffY + ((tabStringsCount - 1) * tabLineSpacing)}" stroke="#475569" stroke-width="1.4"/>`;
-        }
-
-        // Measure Number
-        markup += `<text x="${bX + 4}" y="${trebleStaffY - 24}" font-family="monospace" font-size="10" fill="#64748b">${i + 1}</text>`;
-
-        // Chord Symbol
-        const chordColor = b.dominant ? "#fbbf24" : "#f1f5f9";
-        markup += `
-          <text x="${bX + 6}" y="${trebleStaffY - 8}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="bold" fill="${chordColor}">
-            ${b.chord}
-          </text>
-        `;
-      });
-
-      // 4. Note calculation and coordinates
-      const notePositions = [];
-      solo.forEach((noteData, stepIdx) => {
-        const barIdx = noteData.barIndex;
-        const s = noteData.stepInBar;
-        const stepWidth = barWidth / 8;
-        const noteX = marginX + (barIdx * barWidth) + (s * stepWidth) + (stepWidth / 2);
-
-        if (noteData.rest) {
-          notePositions.push({ rest: true, x: noteX, stepIdx });
+      // Load ABCJS audio and basic renderer
+      const [abcjsReady, setAbcjsReady] = useState(false);
+      useEffect(() => {
+        if (window.ABCJS) {
+          setAbcjsReady(true);
           return;
         }
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-basic-min.js";
+        script.async = true;
+        script.onload = () => setAbcjsReady(true);
+        document.body.appendChild(script);
+      }, []);
 
-        const diatonicSteps = getDiatonicOffsetFromB4(noteData.midi);
-        const middleLineY = trebleStaffY + (staffLineSpacing * 2); // B4
-        const noteHeadY = middleLineY - (diatonicSteps * (staffLineSpacing / 2));
+      // Generate Solo Etude
+      const generateSolo = (customChords = chords, customMeasures = measureCount, customDom = dominantStrategy) => {
+        let flatChords = [];
+        for (let i = 0; i < customMeasures; i++) {
+          let chordStr = customChords[i] || "Cmaj7";
+          let list = chordStr.split(/\s+/).filter(c => c.length > 0);
+          if (list.length === 0) list = ["Cmaj7"];
 
-        notePositions.push({
-          rest: false,
-          x: noteX,
-          y: noteHeadY,
-          stemEndY: noteHeadY - stemLength,
-          stepIdx,
-          data: noteData
-        });
-      });
-
-      // 5. Render Beams for pairs of 8th notes (Beat 1: 0-1, Beat 2: 2-3, Beat 3: 4-5, Beat 4: 6-7)
-      for (let i = 0; i < notePositions.length; i += 2) {
-        const n1 = notePositions[i];
-        const n2 = notePositions[i + 1];
-
-        if (n1 && n2 && !n1.rest && !n2.rest) {
-          // Both notes exist in the beat pair -> connect with straight horizontal beam
-          const beamY = Math.min(n1.stemEndY, n2.stemEndY) - 2;
-          markup += `
-            <line x1="${n1.x + 3.8}" y1="${beamY}" x2="${n2.x + 3.8}" y2="${beamY}" stroke="#e2e8f0" stroke-width="3.2" stroke-linecap="round"/>
-          `;
-          n1.actualStemEndY = beamY;
-          n2.actualStemEndY = beamY;
-        } else if (n1 && !n1.rest) {
-          // Single 8th note flag
-          n1.actualStemEndY = n1.stemEndY;
-          markup += `
-            <path d="M ${n1.x + 3.8} ${n1.stemEndY} Q ${n1.x + 11} ${n1.stemEndY + 8} ${n1.x + 10} ${n1.stemEndY + 15}" stroke="#e2e8f0" stroke-width="1.8" fill="none"/>
-          `;
-        } else if (n2 && !n2.rest) {
-          // Single 8th note flag
-          n2.actualStemEndY = n2.stemEndY;
-          markup += `
-            <path d="M ${n2.x + 3.8} ${n2.stemEndY} Q ${n2.x + 11} ${n2.stemEndY + 8} ${n2.x + 10} ${n2.stemEndY + 15}" stroke="#e2e8f0" stroke-width="1.8" fill="none"/>
-          `;
-        }
-      }
-
-      // 6. Draw Notes & Ledgers & TAB
-      notePositions.forEach(np => {
-        const stepWidth = barWidth / 8;
-        if (np.rest) {
-          // Standard 8th rest symbol
-          markup += `
-            <g id="step-${np.stepIdx}">
-              <text x="${np.x - 3}" y="${trebleStaffY + 22}" font-family="serif" font-size="14" fill="#64748b">&#x1D13E;</text>
-            </g>
-          `;
-          return;
-        }
-
-        const noteData = np.data;
-        const headColor = noteData.isChordTone ? "#f59e0b" : "#38bdf8";
-        const accidental = getAccidental(noteData.midi);
-
-        // Ledger lines
-        if (np.y <= trebleStaffY - 5) {
-          for (let ly = trebleStaffY - staffLineSpacing; ly >= np.y - 2; ly -= staffLineSpacing) {
-            markup += `<line x1="${np.x - 8}" y1="${ly}" x2="${np.x + 8}" y2="${ly}" stroke="#64748b" stroke-width="1.2"/>`;
-          }
-        } else if (np.y >= trebleStaffY + 40) {
-          for (let ly = trebleStaffY + 45; ly <= np.y + 2; ly += staffLineSpacing) {
-            markup += `<line x1="${np.x - 8}" y1="${ly}" x2="${np.x + 8}" y2="${ly}" stroke="#64748b" stroke-width="1.2"/>`;
+          for (let beat = 0; beat < 4; beat++) {
+            let chord = list.length === 1 ? list[0] : (beat < 2 ? list[0] : (list[1] || list[0]));
+            let isDom = isDominantChord(chord);
+            flatChords.push({ measure: i, beat: beat, chord: chord, isDom: isDom });
           }
         }
 
-        // Ties
-        if (noteData.tiedToNext) {
-          const nextNp = notePositions[np.stepIdx + 1];
-          if (nextNp && !nextNp.rest) {
-            const midX = (np.x + nextNp.x) / 2;
-            const tieY = np.y + 7;
-            markup += `
-              <path d="M ${np.x + 3} ${tieY} Q ${midX} ${tieY + 7} ${nextNp.x - 3} ${tieY}" stroke="#e2e8f0" stroke-width="1.4" fill="none"/>
-            `;
+        const events = [];
+        let currentMidi = 65; // F4 anchor
+
+        // Generate tasteful jazz phrases beat by beat
+        for (let m = 0; m < customMeasures; m++) {
+          const isEndingMeasure = (m === customMeasures - 1);
+
+          for (let beat = 0; beat < 4; beat++) {
+            const currentChordObj = flatChords[m * 4 + beat];
+            const chord = currentChordObj.chord;
+            const isDom = currentChordObj.isDom;
+            const rootMatch = chord.match(/^[A-G][#b]?/);
+            const rootStr = rootMatch ? rootMatch[0] : "C";
+            const rootMidi = 60 + getMidiOffset(rootStr);
+            
+            const chordTones = isDom 
+              ? getDominantApproachTones(rootMidi, customDom) 
+              : getChordTones(chord);
+
+            const guideTones = chord.includes('m') && !chord.includes('maj') 
+              ? [rootMidi + 3, rootMidi + 10] 
+              : [rootMidi + 4, rootMidi + (chord.includes('maj') ? 11 : 10)];
+
+            function getNearest(tones, target) {
+              let candidates = [];
+              tones.forEach(t => {
+                for (let oct = -2; oct <= 2; oct++) {
+                  candidates.push(t + oct * 12);
+                }
+              });
+              candidates = candidates.filter(n => n >= 55 && n <= 82);
+              if (candidates.length === 0) return 65;
+              candidates.sort((a, b) => Math.abs(a - target) - Math.abs(b - target));
+              return candidates[0];
+            }
+
+            // Rhythm dice: Triplet, 2-eighths, Quarter note, or tasteful rest
+            const rand = Math.random();
+
+            if (isEndingMeasure && beat >= 2) {
+              // Final chord tonic resolution
+              if (beat === 2) {
+                events.push({
+                  type: 'quarter',
+                  midi: getNearest([rootMidi], currentMidi),
+                  chord: chord,
+                  measure: m,
+                  beat: beat,
+                  isTarget: true
+                });
+              }
+              continue;
+            }
+
+            // 1. Triplets (Authentic Jazz Bebop Triplet Ornament)
+            if (rand < 0.22 && beat !== 3) {
+              const targetLanding = getNearest(guideTones, currentMidi);
+              const dir = targetLanding >= currentMidi ? 1 : -1;
+              const n1 = currentMidi;
+              const n2 = currentMidi + dir;
+              const n3 = targetLanding;
+              currentMidi = n3;
+
+              events.push({
+                type: 'triplet',
+                notes: [n1, n2, n3],
+                chord: chord,
+                measure: m,
+                beat: beat,
+                isDom: isDom
+              });
+            }
+            // 2. Tasteful breath / rest on weak beats
+            else if (rand > 0.88 && (beat === 1 || beat === 3)) {
+              events.push({
+                type: 'rest',
+                chord: chord,
+                measure: m,
+                beat: beat
+              });
+            }
+            // 3. Regular 8th-note pair with Target tone & Chromatic Enclosure
+            else {
+              let n1, n2;
+              const isStrongBeat = (beat === 0 || beat === 2);
+
+              if (isStrongBeat) {
+                // Land firmly on 3rd, 7th, or rich tension
+                n1 = getNearest(guideTones, currentMidi);
+                // 2nd eighth is an approach note or chord tone step
+                n2 = Math.random() < 0.5 ? n1 + (Math.random() < 0.5 ? 1 : -1) : getNearest(chordTones, n1 + 2);
+              } else {
+                // Chromatic enclosure or scalar step into next beat
+                n1 = currentMidi + (Math.random() < 0.5 ? 1 : -1);
+                n2 = getNearest(chordTones, n1);
+              }
+
+              // Keep within guitar/saxophone core jazz range
+              if (n1 < 55) n1 += 12; if (n1 > 82) n1 -= 12;
+              if (n2 < 55) n2 += 12; if (n2 > 82) n2 -= 12;
+              currentMidi = n2;
+
+              events.push({
+                type: 'eighths',
+                notes: [n1, n2],
+                chord: chord,
+                measure: m,
+                beat: beat,
+                isDom: isDom
+              });
+            }
           }
         }
 
-        markup += `
-          <g id="step-note-${np.stepIdx}" class="note-step" data-step="${np.stepIdx}">
-            <!-- Playing cursor zone -->
-            <rect id="cursor-${np.stepIdx}" x="${np.x - (stepWidth / 2)}" y="${trebleStaffY - 26}" width="${stepWidth}" height="${totalSvgHeight - trebleStaffY + 20}" fill="url(#cursorGrad)" opacity="0" rx="3" class="pointer-events-none transition-opacity duration-75"/>
+        setParsedSoloEvents(events);
 
-            <!-- Stem -->
-            <line x1="${np.x + 3.8}" y1="${np.y}" x2="${np.x + 3.8}" y2="${np.actualStemEndY || np.stemEndY}" stroke="#e2e8f0" stroke-width="1.5"/>
+        // Build ABC Strings
+        buildAbcScore(events, customMeasures, customChords);
+      };
 
-            <!-- Note head -->
-            <ellipse cx="${np.x}" cy="${np.y}" rx="4.5" ry="3.5" transform="rotate(-18 ${np.x} ${np.y})" fill="${headColor}"/>
+      // Build Clean ABC Notation with Beams, Triplets, and Backing tracks
+      const buildAbcScore = (events, totalMeasures, currentChords) => {
+        let displayHeader = "X: 1\n";
+        displayHeader += "T: " + currentSongTitle + " (Jazz Solo Etude)\n";
+        displayHeader += "M: 4/4\n";
+        displayHeader += "L: 1/8\n";
+        displayHeader += "K: C\n";
+        displayHeader += "%%staffwidth 800\n";
+        displayHeader += "%%stretchlast 1\n";
 
-            <!-- Accidental -->
-            ${accidental ? `<text x="${np.x - 13}" y="${np.y + 4}" font-family="'JetBrains Mono', sans-serif" font-size="12" font-weight="bold" fill="${headColor}">${accidental}</text>` : ''}
+        let audioHeader = "X: 1\n";
+        audioHeader += "T: " + currentSongTitle + "\n";
+        audioHeader += "M: 4/4\n";
+        audioHeader += "L: 1/8\n";
+        audioHeader += `Q: 1/4=${bpm}\n`;
+        audioHeader += "K: C\n";
+        audioHeader += "%%stretchlast 1\n";
+        audioHeader += "%%staves (1 2 3)\n";
+        audioHeader += "V: 1 clef=treble\n%%MIDI program 0\n%%MIDI control 7 127\n";
+        audioHeader += "V: 2 clef=treble\n%%MIDI program 4\n%%MIDI control 7 60\n";
+        audioHeader += "V: 3 clef=bass\n%%MIDI program 32\n%%MIDI control 7 105\n";
 
-            <!-- Role Tag Label (Cleanly aligned above beam) -->
-            <text x="${np.x}" y="${Math.min(np.actualStemEndY || np.stemEndY, np.y - 28) - 4}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="600" fill="${noteData.isChordTone ? '#fbbf24' : '#7dd3fc'}">${noteData.label}</text>
-        `;
+        let backingHeader = "X: 1\n";
+        backingHeader += "T: " + currentSongTitle + " (Backing Track)\n";
+        backingHeader += "M: 4/4\n";
+        backingHeader += "L: 1/8\n";
+        backingHeader += `Q: 1/4=${bpm}\n`;
+        backingHeader += "K: C\n";
+        backingHeader += "%%stretchlast 1\n";
+        backingHeader += "%%staves (1 2 3)\n";
+        backingHeader += "V: 1 clef=treble\n%%MIDI program 0\n%%MIDI control 7 0\n";
+        backingHeader += "V: 2 clef=treble\n%%MIDI program 4\n%%MIDI control 7 60\n";
+        backingHeader += "V: 3 clef=bass\n%%MIDI program 32\n%%MIDI control 7 105\n";
 
-        // TAB Notation
-        if (showTab) {
-          const tabPos = getFretPosition(noteData.midi, isBass ? "bass" : "guitar");
-          if (tabPos) {
-            const strIdx = tabPos.string - 1;
-            const tabY = tabStaffY + (strIdx * tabLineSpacing);
-            markup += `
-              <rect x="${np.x - 6}" y="${tabY - 6.5}" width="12" height="13" fill="#0e1117" rx="2"/>
-              <text x="${np.x}" y="${tabY + 3.5}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="bold" fill="#f8fafc">
-                ${tabPos.fret}
-              </text>
-            `;
+        let fullMelody = "";
+        let fullPiano = "";
+        let fullBass = "";
+
+        for (let m = 0; m < totalMeasures; m++) {
+          let mAcc = {};
+          let pianoAcc = {};
+          let bassAcc = {};
+          let measureMelody = "";
+
+          const chordLine = currentChords[m] || "Cmaj7";
+          const chordTokens = chordLine.split(/\s+/).filter(c => c.length > 0);
+          const measureEvents = events.filter(e => e.measure === m);
+
+          for (let b = 0; b < 4; b++) {
+            if (b === 0) measureMelody += `"${chordTokens[0]}"`;
+            if (b === 2 && chordTokens.length >= 2) measureMelody += `"${chordTokens[1]}"`;
+
+            const ev = measureEvents.find(e => e.beat === b);
+            if (!ev || ev.type === 'rest') {
+              measureMelody += "z2 ";
+            } else if (ev.type === 'triplet') {
+              const [t1, t2, t3] = ev.notes;
+              measureMelody += `(3${getAbcNote(t1, mAcc, ev.chord)}${getAbcNote(t2, mAcc, ev.chord)}${getAbcNote(t3, mAcc, ev.chord)} `;
+            } else if (ev.type === 'quarter') {
+              measureMelody += `${getAbcNote(ev.midi, mAcc, ev.chord)}2 `;
+            } else if (ev.type === 'eighths') {
+              const [n1, n2] = ev.notes;
+              // Cleanly beamed pair
+              measureMelody += `${getAbcNote(n1, mAcc, ev.chord)}${getAbcNote(n2, mAcc, ev.chord)} `;
+            }
+          }
+
+          measureMelody += (m === totalMeasures - 1) ? " |]" : " | ";
+
+          // Rhythm section backing
+          const root1 = 36 + getMidiOffset((chordTokens[0] || "C").match(/^[A-G][#b]?/)[0]);
+          const root2 = chordTokens[1] ? 36 + getMidiOffset(chordTokens[1].match(/^[A-G][#b]?/)[0]) : root1 + 7;
+
+          let pianoChord1 = "[" + getChordTones(chordTokens[0]).slice(1).map(n => getAbcNote(n - 12, pianoAcc, chordTokens[0])).join("") + "]";
+          let pianoMeasure = "";
+          let bassMeasure = "";
+
+          if (chordTokens.length >= 2) {
+            let pianoChord2 = "[" + getChordTones(chordTokens[1]).slice(1).map(n => getAbcNote(n - 12, pianoAcc, chordTokens[1])).join("") + "]";
+            pianoMeasure = `${pianoChord1}4 ${pianoChord2}4 | `;
+            bassMeasure = `${getAbcNote(root1, bassAcc, chordTokens[0])}2 ${getAbcNote(root1 + 4, bassAcc, chordTokens[0])}2 ${getAbcNote(root2, bassAcc, chordTokens[1])}2 ${getAbcNote(root2 - 1, bassAcc, chordTokens[1])}2 | `;
+          } else {
+            pianoMeasure = `${pianoChord1}8 | `;
+            bassMeasure = `${getAbcNote(root1, bassAcc, chordTokens[0])}2 ${getAbcNote(root1 + 4, bassAcc, chordTokens[0])}2 ${getAbcNote(root1 + 7, bassAcc, chordTokens[0])}2 ${getAbcNote(root1 + 10, bassAcc, chordTokens[0])}2 | `;
+          }
+
+          if (m === totalMeasures - 1) {
+            pianoMeasure = pianoMeasure.replace(" | ", " |]");
+            bassMeasure = bassMeasure.replace(" | ", " |]");
+          }
+
+          fullMelody += measureMelody;
+          fullPiano += pianoMeasure;
+          fullBass += bassMeasure;
+
+          if ((m + 1) % 4 === 0 || m === totalMeasures - 1) {
+            fullMelody += "\n";
+            fullPiano += "\n";
+            fullBass += "\n";
           }
         }
 
-        markup += `</g>`;
-      });
-
-      svg.innerHTML = markup;
-    }
-
-    /* ==========================================================================
-       Fretboard Position Monitor
-       ========================================================================== */
-
-    function renderFretboard() {
-      const container = document.getElementById("fretboardContainer");
-      const isBass = state.tabMode === "bass";
-      const numStrings = isBass ? 4 : 6;
-      const totalFrets = 15;
-      const names = isBass ? BASS_NAMES : GUITAR_NAMES;
-
-      let html = `<div class="relative w-full h-full flex flex-col justify-between">`;
-
-      // Frets
-      html += `<div class="absolute inset-0 flex justify-between pointer-events-none">`;
-      for (let f = 0; f <= totalFrets; f++) {
-        html += `
-          <div class="h-full flex flex-col items-center justify-end relative" style="width: ${100 / (totalFrets + 1)}%;">
-            <div class="${f === 0 ? 'w-2 bg-amber-200/90' : 'w-[1.5px] bg-gray-700'} h-full"></div>
-            <span class="text-[9px] font-mono text-gray-500 absolute -bottom-3">${f}</span>
-          </div>
-        `;
-      }
-      html += `</div>`;
-
-      // Markers (3, 5, 7, 9, 12)
-      html += `<div class="absolute inset-0 flex pointer-events-none">`;
-      [3, 5, 7, 9, 12].forEach(df => {
-        const leftPercent = (df / (totalFrets + 1)) * 100 + (100 / (totalFrets + 1) / 2);
-        if (df === 12) {
-          html += `
-            <div class="absolute w-2 h-2 rounded-full bg-gray-700 top-1/4 -translate-x-1/2" style="left: ${leftPercent}%;"></div>
-            <div class="absolute w-2 h-2 rounded-full bg-gray-700 bottom-1/4 -translate-x-1/2" style="left: ${leftPercent}%;"></div>
-          `;
-        } else {
-          html += `<div class="absolute w-2 h-2 rounded-full bg-gray-700 top-1/2 -translate-y-1/2 -translate-x-1/2" style="left: ${leftPercent}%;"></div>`;
-        }
-      });
-      html += `</div>`;
-
-      // Strings
-      for (let s = 0; s < numStrings; s++) {
-        html += `
-          <div class="relative w-full flex items-center h-3 z-10">
-            <div class="w-full bg-gray-400" style="height: ${1 + s * 0.7}px; opacity: 0.65;"></div>
-            <span class="absolute -left-6 text-[10px] font-mono font-bold text-gray-400">${names[s][0]}</span>
-          </div>
-        `;
-      }
-
-      // Marker
-      html += `<div id="fretboardNoteMarker" class="absolute z-20 w-5 h-5 rounded-full bg-amber-500 shadow-md shadow-amber-500/50 flex items-center justify-center text-black font-bold text-[10px] transition-all duration-75 opacity-0 pointer-events-none -translate-x-1/2 -translate-y-1/2"></div>`;
-
-      html += `</div>`;
-      container.innerHTML = html;
-    }
-
-    function highlightFretboardNote(targetMidi) {
-      const marker = document.getElementById("fretboardNoteMarker");
-      if (!marker || !targetMidi) {
-        if (marker) marker.style.opacity = "0";
-        return;
-      }
-
-      const isBass = state.tabMode === "bass";
-      const totalFrets = 15;
-      const tabPos = getFretPosition(targetMidi, isBass ? "bass" : "guitar");
-
-      if (tabPos && tabPos.fret <= totalFrets) {
-        const numStrings = isBass ? 4 : 6;
-        const stringIdx = tabPos.string - 1;
-        const fret = tabPos.fret;
-
-        const leftPercent = fret === 0 
-          ? 2 
-          : ((fret / (totalFrets + 1)) * 100) - (100 / (totalFrets + 1) / 2);
-        
-        const topPercent = (stringIdx / (numStrings - 1)) * 100;
-
-        marker.style.left = `${leftPercent}%`;
-        marker.style.top = `${topPercent}%`;
-        marker.innerText = midiToName(targetMidi).replace(/[0-9]/g, '');
-        marker.style.opacity = "1";
-      } else {
-        marker.style.opacity = "0";
-      }
-    }
-
-    /* ==========================================================================
-       Web Audio API: Authentic Legato Swing & Rhythm Section
-       ========================================================================== */
-
-    let audioCtx = null;
-    let nextStepTime = 0;
-    const scheduleAheadTime = 0.15;
-    let playbackTimer = null;
-
-    function initAudio() {
-      if (!audioCtx) {
-        const AudioClass = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioClass();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-    }
-
-    // Warm Legato Hollow-body Jazz Guitar / Rhodes tone
-    function playSoloVoice(midi, time, duration, isOffbeat = false) {
-      if (state.soloMute) return;
-      const freq = midiToFreq(midi);
-
-      const osc1 = audioCtx.createOscillator();
-      const osc2 = audioCtx.createOscillator();
-      const filter = audioCtx.createBiquadFilter();
-      const gain = audioCtx.createGain();
-
-      osc1.type = "triangle";
-      osc2.type = "sine";
-      osc1.frequency.setValueAtTime(freq, time);
-      osc2.frequency.setValueAtTime(freq, time);
-
-      // Warm low-pass
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(isOffbeat ? 1700 : 1350, time);
-      filter.frequency.exponentialRampToValueAtTime(750, time + duration);
-
-      // Legato Jazz Envelope (Offbeats get accent push, downbeats tenuto)
-      const peakVol = isOffbeat ? 0.32 : 0.26;
-      gain.gain.setValueAtTime(0.0001, time);
-      gain.gain.linearRampToValueAtTime(peakVol, time + 0.015);
-      gain.gain.setValueAtTime(peakVol * 0.85, time + duration * 0.7);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + duration * 0.98); // Smooth legato tail
-
-      osc1.connect(filter);
-      osc2.connect(filter);
-      filter.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      osc1.start(time);
-      osc2.start(time);
-      osc1.stop(time + duration);
-      osc2.stop(time + duration);
-    }
-
-    // Authentic Walking Bass (Round attack, singing sustain)
-    function playWalkingBass(pitchClass, time, duration) {
-      const osc = audioCtx.createOscillator();
-      const filter = audioCtx.createBiquadFilter();
-      const gain = audioCtx.createGain();
-
-      const bassMidi = 36 + (pitchClass % 12); // C2 ~ B2
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(midiToFreq(bassMidi), time);
-
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(380, time);
-
-      gain.gain.setValueAtTime(0.0001, time);
-      gain.gain.linearRampToValueAtTime(0.36, time + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.18, time + duration * 0.65);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + duration * 0.92);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      osc.start(time);
-      osc.stop(time + duration);
-    }
-
-    // Authentic Jazz Ride Cymbal ("Spang-a-lang" pattern)
-    function playRideCymbal(time, isAccent = false) {
-      const bufferSize = audioCtx.sampleRate * 0.15;
-      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
-
-      const noise = audioCtx.createBufferSource();
-      noise.buffer = buffer;
-
-      const bandpass = audioCtx.createBiquadFilter();
-      bandpass.type = "bandpass";
-      bandpass.frequency.setValueAtTime(6800, time);
-      bandpass.Q.setValueAtTime(4.0, time);
-
-      const gain = audioCtx.createGain();
-      const vol = isAccent ? 0.05 : 0.025;
-      gain.gain.setValueAtTime(vol, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + (isAccent ? 0.14 : 0.08));
-
-      noise.connect(bandpass);
-      bandpass.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      noise.start(time);
-      noise.stop(time + 0.15);
-    }
-
-    // Soft Hi-Hat on Beats 2 and 4 (Crisp foot chick)
-    function playHiHatPedal(time) {
-      const bufferSize = audioCtx.sampleRate * 0.05;
-      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
-
-      const noise = audioCtx.createBufferSource();
-      noise.buffer = buffer;
-
-      const hp = audioCtx.createBiquadFilter();
-      hp.type = "highpass";
-      hp.frequency.setValueAtTime(8000, time);
-
-      const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime(0.04, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
-
-      noise.connect(hp);
-      hp.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      noise.start(time);
-      noise.stop(time + 0.05);
-    }
-
-    // Gentle Piano Comping Chords
-    function playPianoComp(root, type, time, duration = 0.28) {
-      const intervals = getChordTones(root, type).slice(0, 4);
-      intervals.forEach(intv => {
-        const pitch = 60 + ((root + intv) % 12);
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(midiToFreq(pitch), time);
-
-        gain.gain.setValueAtTime(0.0001, time);
-        gain.gain.linearRampToValueAtTime(0.04, time + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start(time);
-        osc.stop(time + duration);
-      });
-    }
-
-    /* ==========================================================================
-       Scheduler & Groove Math (Legato 2:1 Swing Ratio)
-       ========================================================================== */
-
-    function getStepDuration(stepInBar, secPerBeat) {
-      // Jazz Swing ratio: Downbeat gets ~63%, Upbeat gets ~37% (triplet swing feel)
-      const isDownbeat = (stepInBar % 2 === 0);
-      return isDownbeat ? (secPerBeat * 0.63) : (secPerBeat * 0.37);
-    }
-
-    function scheduleStep(stepIdx, scheduledTime) {
-      const noteData = state.generatedSolo[stepIdx];
-      if (!noteData) return;
-
-      const prog = PROGRESSIONS[state.progressionKey];
-      const bar = prog.bars[noteData.barIndex];
-      const s = noteData.stepInBar; // 0 to 7
-      const isDownbeat = (s % 2 === 0);
-      const isOffbeat = !isDownbeat;
-
-      const secPerBeat = 60.0 / state.bpm;
-      const stepDur = getStepDuration(s, secPerBeat);
-      // Legato: Note sustains for 92% of the step duration (no carnival staccato clicks)
-      const notePlayDuration = stepDur * 0.92;
-
-      // 1. Play Solo Line
-      if (!noteData.rest && noteData.midi && !noteData.tiedFromPrev) {
-        let dur = notePlayDuration;
-        if (noteData.tiedToNext) {
-          const nextDur = getStepDuration((s + 1) % 8, secPerBeat);
-          dur += nextDur;
-        }
-        playSoloVoice(noteData.midi, scheduledTime, dur, isOffbeat);
-      }
-
-      // 2. Rhythm Section Backing
-      if (isDownbeat) {
-        const beatNum = s / 2; // Beat 0, 1, 2, 3 (1, 2, 3, 4 in bar)
-        let bassPc = bar.root;
-        if (beatNum === 1) bassPc = (bar.root + 4) % 12;
-        if (beatNum === 2) bassPc = (bar.root + 7) % 12;
-        if (beatNum === 3) bassPc = (bar.root + 11) % 12;
-
-        playWalkingBass(bassPc, scheduledTime, secPerBeat * 0.92);
-
-        // Ride cymbal on 1, 2, 3, 4
-        playRideCymbal(scheduledTime, (beatNum === 1 || beatNum === 3));
-
-        // Hi-Hat pedal chick strictly on beats 2 and 4
-        if (beatNum === 1 || beatNum === 3) {
-          playHiHatPedal(scheduledTime);
-        }
-
-        // Charleston piano comping on 'and' of 2 or beat 4
-        if (beatNum === 1 && Math.random() > 0.35) {
-          playPianoComp(bar.root, bar.type, scheduledTime + (secPerBeat * 0.63), 0.3);
-        }
-      } else {
-        // Swing upbeat ride tap ("skip" note on 'and' of 2 and 4)
-        if (s === 3 || s === 7) {
-          playRideCymbal(scheduledTime, false);
-        }
-      }
-
-      // 3. UI sync
-      const delayMs = Math.max(0, (scheduledTime - audioCtx.currentTime) * 1000);
-      setTimeout(() => {
-        if (!state.isPlaying) return;
-        updateVisualCursor(stepIdx);
-      }, delayMs);
-    }
-
-    function scheduler() {
-      while (nextStepTime < audioCtx.currentTime + scheduleAheadTime) {
-        scheduleStep(state.currentStep, nextStepTime);
-        advanceStep();
-      }
-    }
-
-    function advanceStep() {
-      const secPerBeat = 60.0 / state.bpm;
-      const s = state.currentStep % 8;
-      const dur = getStepDuration(s, secPerBeat);
-      nextStepTime += dur;
-      state.currentStep = (state.currentStep + 1) % state.totalSteps;
-    }
-
-    function togglePlayback() {
-      initAudio();
-      state.isPlaying = !state.isPlaying;
-
-      const btnPlay = document.getElementById("btnPlay");
-      const playIcon = document.getElementById("playIcon");
-      const playLabel = document.getElementById("playLabel");
-
-      if (state.isPlaying) {
-        state.currentStep = 0;
-        nextStepTime = audioCtx.currentTime + 0.05;
-        playbackTimer = setInterval(scheduler, 25);
-
-        btnPlay.classList.remove("bg-amber-500", "hover:bg-amber-400", "text-black");
-        btnPlay.classList.add("bg-rose-600", "hover:bg-rose-500", "text-white");
-        playIcon.innerHTML = `<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`;
-        playLabel.innerText = "停止";
-      } else {
-        clearInterval(playbackTimer);
-        clearAllVisualCursors();
-
-        btnPlay.classList.add("bg-amber-500", "hover:bg-amber-400", "text-black");
-        btnPlay.classList.remove("bg-rose-600", "hover:bg-rose-500", "text-white");
-        playIcon.innerHTML = `<path d="M8 5v14l11-7z"/>`;
-        playLabel.innerText = "再生";
-      }
-    }
-
-    function clearAllVisualCursors() {
-      document.querySelectorAll("[id^='cursor-']").forEach(el => el.setAttribute("opacity", "0"));
-      highlightFretboardNote(null);
-      document.getElementById("currentFretChord").innerText = "--";
-    }
-
-    function updateVisualCursor(stepIdx) {
-      clearAllVisualCursors();
-      const cursor = document.getElementById(`cursor-${stepIdx}`);
-      if (cursor) cursor.setAttribute("opacity", "0.4");
-
-      const noteData = state.generatedSolo[stepIdx];
-      if (noteData) {
-        if (!noteData.rest && noteData.midi) {
-          highlightFretboardNote(noteData.midi);
-        }
-        document.getElementById("currentFretChord").innerText = noteData.chord;
-
-        const noteElem = document.getElementById(`step-note-${stepIdx}`);
-        const wrapper = document.getElementById("notationWrapper");
-        if (noteElem && wrapper) {
-          const bbox = noteElem.getBoundingClientRect();
-          const wrapBox = wrapper.getBoundingClientRect();
-          if (bbox.right > wrapBox.right - 60 || bbox.left < wrapBox.left + 60) {
-            wrapper.scrollLeft = (noteElem.offsetLeft || 0) - 160;
-          }
-        }
-      }
-    }
-
-    function updateActiveChordBadge() {
-      const strip = document.getElementById("chordStrip");
-      const prog = PROGRESSIONS[state.progressionKey];
-      strip.innerHTML = prog.bars.map((b) => `
-        <span class="px-2.5 py-1 rounded-md ${b.dominant ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-jazz-850 text-gray-300'}">
-          ${b.chord}
-        </span>
-      `).join("");
-
-      const badge = document.getElementById("activeScaleBadge");
-      const app = state.dominantApproach;
-      if (app === "altered") {
-        badge.innerText = "V7 Approach: Altered Scale (b9, #9, #11, b13)";
-        badge.className = "text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono";
-      } else if (app === "condim") {
-        badge.innerText = "V7 Approach: Half-Whole Diminished (13, b9, #9)";
-        badge.className = "text-xs px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-mono";
-      } else {
-        badge.innerText = "V7 Approach: Pure Chord Tones & Guide Tones";
-        badge.className = "text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono";
-      }
-
-      const tabNotice = document.getElementById("tabNotice");
-      const fretBadge = document.getElementById("fretboardInstrumentBadge");
-      if (state.tabMode === "guitar") {
-        tabNotice.innerText = "※ ギターTAB (6弦・EADGBE) を表示中。ポジションは5フレット周辺に最適化。";
-        fretBadge.innerText = "(Guitar 22 Frets / EADGBE)";
-      } else if (state.tabMode === "bass") {
-        tabNotice.innerText = "※ ベースTAB (4弦・EADG) を表示中。実音ピッチを保ったままTABのみ1オクターブ下(8vb)に移調して表示。";
-        fretBadge.innerText = "(Bass 4 Strings / 8vb Adapted)";
-      } else {
-        tabNotice.innerText = "※ タブ譜は非表示です（五線譜のみ表示中）。";
-        fretBadge.innerText = "(Fretboard Position Monitor)";
-      }
-    }
-
-    /* ==========================================================================
-       Event Listeners & Boot
-       ========================================================================== */
-
-    function setupEventListeners() {
-      document.getElementById("btnPlay").addEventListener("click", togglePlayback);
-
-      document.getElementById("btnRegen").addEventListener("click", () => {
-        const wasPlaying = state.isPlaying;
-        if (wasPlaying) togglePlayback();
-        generateSoloPhrase();
-        if (wasPlaying) togglePlayback();
-      });
-
-      document.getElementById("progressionSelect").addEventListener("change", (e) => {
-        state.progressionKey = e.target.value;
-        generateSoloPhrase();
-      });
-
-      document.getElementById("dominantApproachSelect").addEventListener("change", (e) => {
-        state.dominantApproach = e.target.value;
-        generateSoloPhrase();
-      });
-
-      document.getElementById("densitySelect").addEventListener("change", (e) => {
-        state.density = e.target.value;
-        generateSoloPhrase();
-      });
-      document.getElementById("targetFocusSelect").addEventListener("change", (e) => {
-        state.targetFocus = e.target.value;
-        generateSoloPhrase();
-      });
-      document.getElementById("approachTypeSelect").addEventListener("change", (e) => {
-        state.approachType = e.target.value;
-        generateSoloPhrase();
-      });
-
-      const bpmSlider = document.getElementById("bpmSlider");
-      const bpmVal = document.getElementById("bpmVal");
-      bpmSlider.addEventListener("input", (e) => {
-        state.bpm = parseInt(e.target.value, 10);
-        bpmVal.innerText = `${state.bpm} BPM`;
-      });
-
-      document.querySelectorAll(".tab-mode-btn").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-          document.querySelectorAll(".tab-mode-btn").forEach(b => {
-            b.classList.remove("active", "bg-amber-500", "text-black", "font-bold");
-            b.classList.add("text-gray-300");
+        setAbcString(displayHeader + fullMelody);
+
+        let finalAudio = audioHeader;
+        finalAudio += "[V: 1]\n[Q: 1/4=" + bpm + "]\n" + fullMelody;
+        finalAudio += "[V: 2]\n[Q: 1/4=" + bpm + "]\n" + fullPiano;
+        finalAudio += "[V: 3]\n[Q: 1/4=" + bpm + "]\n" + fullBass;
+        setAudioAbcString(finalAudio);
+
+        let finalBacking = backingHeader;
+        finalBacking += "[V: 1]\n[Q: 1/4=" + bpm + "]\n" + fullMelody;
+        finalBacking += "[V: 2]\n[Q: 1/4=" + bpm + "]\n" + fullPiano;
+        finalBacking += "[V: 3]\n[Q: 1/4=" + bpm + "]\n" + fullBass;
+        setBackingAbcString(finalBacking);
+      };
+
+      // Select Standard Song Preset
+      const selectStandardSong = (song) => {
+        setMeasureCount(song.measures);
+        const newChords = Array(64).fill("");
+        song.chords.forEach((c, i) => { newChords[i] = c; });
+        setChords(newChords);
+        setCurrentSongTitle(song.title);
+        setIsModalOpen(false);
+        generateSolo(newChords, song.measures, dominantStrategy);
+      };
+
+      // Re-render score and synth on change
+      useEffect(() => {
+        if (!abcjsReady || !abcString || !window.ABCJS) return;
+
+        // Render sheet music if in staff mode
+        if (viewMode === 'staff') {
+          window.ABCJS.renderAbc("paper", abcString, {
+            responsive: "resize",
+            add_classes: true,
+            paddingtop: 10,
+            paddingbottom: 25,
+            paddingleft: 0,
+            paddingright: 0,
+            staffwidth: 780
           });
-          const target = e.currentTarget;
-          target.classList.add("active", "bg-amber-500", "text-black", "font-bold");
-          target.classList.remove("text-gray-300");
-
-          state.tabMode = target.dataset.tabMode;
-          renderScore();
-          renderFretboard();
-          updateActiveChordBadge();
-        });
-      });
-
-      document.getElementById("soloMute").addEventListener("change", (e) => {
-        state.soloMute = e.target.checked;
-      });
-
-      window.addEventListener("keydown", (e) => {
-        if (e.code === "Space" && e.target.tagName !== "INPUT" && e.target.tagName !== "SELECT") {
-          e.preventDefault();
-          togglePlayback();
         }
-      });
 
-      window.addEventListener("resize", () => {
-        renderScore();
-      });
+        // Setup audio synth
+        const activeAudioStr = isBackingOnly ? backingAbcString : audioAbcString;
+        const visualObj = window.ABCJS.renderAbc("audio-paper", activeAudioStr, { add_classes: true })[0];
+
+        if (window.ABCJS.synth.supportsAudio() && audioRef.current) {
+          if (synthRef.current) {
+            synthRef.current.pause();
+            synthRef.current.disable(true);
+          }
+          audioRef.current.innerHTML = "";
+
+          const cursorControl = {
+            onStart: () => setActiveStepIndex(null),
+            onEvent: (ev) => {
+              if (!ev || (ev.measureStart && ev.left === null)) return;
+              if (ev.elements && Array.isArray(ev.elements)) {
+                const noteElem = ev.elements[0];
+                if (noteElem && noteElem.getAttribute) {
+                  // Track playing position
+                }
+              }
+            },
+            onFinished: () => setActiveStepIndex(null)
+          };
+
+          const synthControl = new window.ABCJS.synth.SynthController();
+          synthControl.load(audioRef.current, cursorControl, {
+            displayLoop: true,
+            displayRestart: true,
+            displayPlay: true,
+            displayProgress: true,
+            displayWarp: false
+          });
+
+          synthControl.setTune(visualObj, false, { chordsOff: true }).catch(console.error);
+          synthRef.current = synthControl;
+        }
+      }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsReady, viewMode]);
+
+      // Handle strategy or BPM update
+      const handleStrategyChange = (strat) => {
+        setDominantStrategy(strat);
+        generateSolo(chords, measureCount, strat);
+      };
+
+      const handleBpmSlider = (val) => {
+        setBpm(val);
+        buildAbcScore(parsedSoloEvents, measureCount, chords);
+      };
+
+      // Custom Clean TAB View Renderer (4 measures per line)
+      const renderTabScore = (instrument) => {
+        const isBass = instrument === "bass";
+        const stringsCount = isBass ? 4 : 6;
+        const stringNames = isBass ? ["G", "D", "A", "E"] : ["E", "B", "G", "D", "A", "E"];
+        const measuresPerRow = 4;
+        const rowsCount = Math.ceil(measureCount / measuresPerRow);
+
+        const rows = [];
+        for (let r = 0; r < rowsCount; r++) {
+          const rowMeasures = [];
+          for (let m = 0; m < measuresPerRow; m++) {
+            const mIdx = r * measuresPerRow + m;
+            if (mIdx < measureCount) {
+              rowMeasures.push(mIdx);
+            }
+          }
+          rows.push(rowMeasures);
+        }
+
+        return (
+          <div className="space-y-6 w-full max-w-4xl mx-auto py-2">
+            <div className="flex items-center justify-between border-b pb-2 mb-4 text-xs font-semibold text-slate-500">
+              <span className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                <span>{isBass ? "4-String Bass TAB" : "6-String Guitar TAB"}</span>
+              </span>
+              {isBass && (
+                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-mono text-[11px] font-bold">
+                  8vb (実音ピッチそのまま / TABのみ1オクターブ下げて最適化)
+                </span>
+              )}
+            </div>
+
+            {rows.map((row, rIdx) => (
+              <div key={rIdx} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm overflow-x-auto custom-scrollbar">
+                <div className="grid grid-cols-4 gap-2 min-w-[720px]">
+                  {row.map(mIdx => {
+                    const measureEvents = parsedSoloEvents.filter(e => e.measure === mIdx);
+                    const chordText = chords[mIdx] || "Cmaj7";
+
+                    return (
+                      <div key={mIdx} className="border-r last:border-r-0 border-slate-300 pr-2 relative">
+                        {/* Measure Header & Chord */}
+                        <div className="flex justify-between items-center mb-1.5 px-1">
+                          <span className="text-[10px] font-mono text-slate-400">m.{mIdx + 1}</span>
+                          <span className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded ${
+                            isDominantChord(chordText) 
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                              : 'text-slate-800'
+                          }`}>
+                            {chordText}
+                          </span>
+                        </div>
+
+                        {/* TAB Staff SVG */}
+                        <svg viewBox={`0 0 170 ${stringsCount * 14 + 10}`} className="w-full h-auto">
+                          {/* TAB Lines */}
+                          {Array.from({ length: stringsCount }).map((_, s) => (
+                            <line 
+                              key={s} 
+                              x1="0" 
+                              y1={10 + s * 14} 
+                              x2="170" 
+                              y2={10 + s * 14} 
+                              stroke="#94a3b8" 
+                              strokeWidth="1" 
+                            />
+                          ))}
+
+                          {/* Event Notes */}
+                          {measureEvents.map((ev, evIdx) => {
+                            const beatX = 18 + (ev.beat * 38);
+
+                            if (ev.type === 'rest') {
+                              return (
+                                <text key={evIdx} x={beatX + 10} y={stringsCount * 7 + 10} textAnchor="middle" fontSize="11" fill="#94a3b8" fontStyle="italic">
+                                  —
+                                </text>
+                              );
+                            } else if (ev.type === 'triplet') {
+                              return (
+                                <g key={evIdx}>
+                                  <text x={beatX + 16} y="6" textAnchor="middle" fontSize="8" fill="#64748b" fontWeight="bold">3</text>
+                                  {ev.notes.map((n, ni) => {
+                                    const tab = calculateTabFret(n, instrument);
+                                    if (!tab) return null;
+                                    const y = 10 + (tab.string - 1) * 14;
+                                    const x = beatX + (ni * 12);
+                                    return (
+                                      <g key={ni}>
+                                        <rect x={x - 4} y={y - 6} width="8" height="11" fill="#ffffff" />
+                                        <text x={x} y={y + 3.5} textAnchor="middle" fontSize="10" fontWeight="bold" fill={ev.isDom ? "#d97706" : "#2563eb"}>
+                                          {tab.fret}
+                                        </text>
+                                      </g>
+                                    );
+                                  })}
+                                </g>
+                              );
+                            } else if (ev.type === 'quarter') {
+                              const tab = calculateTabFret(ev.midi, instrument);
+                              if (!tab) return null;
+                              const y = 10 + (tab.string - 1) * 14;
+                              return (
+                                <g key={evIdx}>
+                                  <rect x={beatX + 6} y={y - 6} width="10" height="11" fill="#ffffff" />
+                                  <text x={beatX + 11} y={y + 3.5} textAnchor="middle" fontSize="11" fontWeight="bold" fill="#0f172a">
+                                    {tab.fret}
+                                  </text>
+                                </g>
+                              );
+                            } else if (ev.type === 'eighths') {
+                              return (
+                                <g key={evIdx}>
+                                  {ev.notes.map((n, ni) => {
+                                    const tab = calculateTabFret(n, instrument);
+                                    if (!tab) return null;
+                                    const y = 10 + (tab.string - 1) * 14;
+                                    const x = beatX + (ni * 16) + 4;
+                                    return (
+                                      <g key={ni}>
+                                        <rect x={x - 4.5} y={y - 6} width="9" height="11" fill="#ffffff" />
+                                        <text x={x} y={y + 3.5} textAnchor="middle" fontSize="10.5" fontWeight="bold" fill={ev.isDom ? "#d97706" : "#1e293b"}>
+                                          {tab.fret}
+                                        </text>
+                                      </g>
+                                    );
+                                  })}
+                                </g>
+                              );
+                            }
+                            return null;
+                          })}
+                        </svg>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-50 print:bg-white text-slate-800 p-3 sm:p-6 md:p-8">
+          <div className="max-w-6xl mx-auto space-y-6">
+
+            {/* Header */}
+            <header className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 print:hidden">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 font-display flex items-center gap-2">
+                    Jazz Solo Lab <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-sans font-semibold border border-blue-200">Light Edition</span>
+                  </h1>
+                  <p className="text-xs text-slate-500">コードトーン &amp; ドミナント7thアプローチ・エチュードジェネレーター</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs sm:text-sm rounded-xl border border-blue-200 transition shadow-sm flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                  <span>曲を選ぶ ({currentSongTitle})</span>
+                </button>
+
+                <button
+                  onClick={() => generateSolo(chords, measureCount, dominantStrategy)}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl shadow-md shadow-blue-600/20 transition active:scale-95 text-xs sm:text-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  <span>再生成</span>
+                </button>
+              </div>
+            </header>
+
+            {/* Controls Bar: V7 Approach, View Mode, BPM */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4 print:hidden">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                
+                {/* 1. Dominant 7th Strategy (The Requested Feature) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center justify-between">
+                    <span>ドミナント7thのアプローチ</span>
+                    <span className="text-[10px] text-amber-700 font-semibold">V7コードに適用</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button
+                      onClick={() => handleStrategyChange('chordTone')}
+                      className={`py-1.5 px-2 text-xs font-medium rounded-lg transition ${
+                        dominantStrategy === 'chordTone' 
+                          ? 'bg-white text-slate-900 font-bold shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      コードトーン
+                    </button>
+                    <button
+                      onClick={() => handleStrategyChange('altered')}
+                      className={`py-1.5 px-2 text-xs font-medium rounded-lg transition ${
+                        dominantStrategy === 'altered' 
+                          ? 'bg-amber-500 text-white font-bold shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      オルタード
+                    </button>
+                    <button
+                      onClick={() => handleStrategyChange('condim')}
+                      className={`py-1.5 px-2 text-xs font-medium rounded-lg transition ${
+                        dominantStrategy === 'condim' 
+                          ? 'bg-teal-600 text-white font-bold shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      コンディミ
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    {dominantStrategy === 'altered' && '※ Altered: ♭9, ♯9, 3, ♯11, ♭13, ♭7 を活用した緊張感ある解決'}
+                    {dominantStrategy === 'condim' && '※ H-W Dim: 1, ♭9, ♯9, 3, ♯11, 5, 13, ♭7 の幾何学ディミニッシュ・リック'}
+                    {dominantStrategy === 'chordTone' && '※ 3rd・7thのガイドトーン連結と9th/13thによる王道スウィング'}
+                  </p>
+                </div>
+
+                {/* 2. Display View Switch (Requested: Mutual Exclusive Toggle) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    楽譜の表示切り替え
+                  </label>
+                  <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button
+                      onClick={() => setViewMode('staff')}
+                      className={`py-1.5 px-2 text-xs font-medium rounded-lg transition ${
+                        viewMode === 'staff' 
+                          ? 'bg-blue-600 text-white font-bold shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      五線譜
+                    </button>
+                    <button
+                      onClick={() => setViewMode('guitar')}
+                      className={`py-1.5 px-2 text-xs font-medium rounded-lg transition ${
+                        viewMode === 'guitar' 
+                          ? 'bg-blue-600 text-white font-bold shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      ギター TAB
+                    </button>
+                    <button
+                      onClick={() => setViewMode('bass')}
+                      className={`py-1.5 px-2 text-xs font-medium rounded-lg transition ${
+                        viewMode === 'bass' 
+                          ? 'bg-blue-600 text-white font-bold shadow-sm' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      ベース TAB
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    {viewMode === 'staff' && '※ 視認性の高い標準五線譜（3連符ビーム・スウィング表記）'}
+                    {viewMode === 'guitar' && '※ ギターTAB (6弦・EADGBE) 5〜8フレット中心の最適ポジション'}
+                    {viewMode === 'bass' && '※ ベースTAB (4弦・EADG) 実音ピッチ維持＆TABのみ1オクターブ下(8vb)'}
+                  </p>
+                </div>
+
+                {/* 3. Tempo (BPM) & Playback Options */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-600">テンポ (BPM)</span>
+                    <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{bpm} BPM</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="60"
+                    max="220"
+                    step="5"
+                    value={bpm}
+                    onChange={(e) => handleBpmSlider(Number(e.target.value))}
+                    className="w-full accent-blue-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-mono">
+                    <span>80 (Ballad)</span>
+                    <span>130 (Medium Swing)</span>
+                    <span>200 (Up)</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Sheet Music / TAB Canvas Container */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              {/* Score Control Bar */}
+              <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex flex-wrap justify-between items-center gap-3 print:hidden">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-slate-800 font-display">
+                    {currentSongTitle}
+                  </span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-mono font-semibold">
+                    {measureCount} 小節
+                  </span>
+                  <span className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold ${
+                    dominantStrategy === 'altered' ? 'bg-amber-100 text-amber-800' : 
+                    dominantStrategy === 'condim' ? 'bg-teal-100 text-teal-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    V7: {dominantStrategy === 'altered' ? 'Altered Scale' : dominantStrategy === 'condim' ? 'H-W Diminished' : 'Chord Tones'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isBackingOnly}
+                      onChange={(e) => setIsBackingOnly(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500"
+                    />
+                    <span>伴奏のみ再生（マイナスワン）</span>
+                  </label>
+
+                  <button
+                    onClick={() => window.print()}
+                    className="text-xs flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg shadow-sm transition font-medium"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    <span>印刷 / PDF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Synthesizer Player Mount */}
+              <div className="bg-white border-b border-slate-100 p-3 flex justify-center print:hidden">
+                <div ref={audioRef} className="w-full max-w-xl"></div>
+              </div>
+
+              {/* View Output (Staff or Guitar TAB or Bass TAB) */}
+              <div className="p-4 sm:p-8 flex justify-center w-full min-h-[420px] overflow-x-auto custom-scrollbar">
+                {viewMode === 'staff' ? (
+                  <div className="w-full max-w-[850px]">
+                    <div id="paper" className="w-full"></div>
+                    <div id="audio-paper" style={{ position: 'absolute', top: '-9999px', visibility: 'hidden' }}></div>
+                  </div>
+                ) : (
+                  renderTabScore(viewMode)
+                )}
+              </div>
+            </div>
+
+            {/* Chord Progression Grid Accordion / Editor */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 print:hidden space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-bold text-slate-800">コード進行チャート</span>
+                  <p className="text-xs text-slate-500">セルを直接クリックしてコードを自由に変更・調整できます。</p>
+                </div>
+                <button
+                  onClick={() => generateSolo(chords, measureCount, dominantStrategy)}
+                  className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 transition font-medium"
+                >
+                  この進行でエチュードを更新
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                {Array.from({ length: measureCount }).map((_, i) => (
+                  <div key={i} className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-mono pl-1">{i + 1}</span>
+                    <input
+                      type="text"
+                      value={chords[i] || ""}
+                      onChange={(e) => {
+                        const newC = [...chords];
+                        newC[i] = e.target.value;
+                        setChords(newC);
+                      }}
+                      placeholder="Cmaj7"
+                      className="border border-slate-200 p-1.5 rounded-lg text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-inner bg-slate-50"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Standard Song Selection Modal */}
+          {isModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col border border-slate-200 animate-[fadeIn_0.15s_ease-out]">
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                    スタンダード曲を選択（フルサイズ）
+                  </h2>
+                  <button 
+                    onClick={() => setIsModalOpen(false)} 
+                    className="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-full border border-slate-200 transition"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </div>
+                <div className="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-2">
+                  {STANDARD_SONGS.map((song, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => selectStandardSong(song)}
+                      className="w-full text-left px-4 py-3 rounded-xl hover:bg-blue-50 border border-slate-100 hover:border-blue-200 transition flex justify-between items-center group bg-white shadow-sm"
+                    >
+                      <div>
+                        <div className="font-semibold text-slate-800 group-hover:text-blue-700 transition">{song.title}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">Key: {song.key}</div>
+                      </div>
+                      <span className="text-xs text-slate-500 bg-slate-100 group-hover:bg-white group-hover:text-blue-600 px-2.5 py-1 rounded-md transition border border-slate-200">
+                        {song.measures} 小節
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <footer className="max-w-6xl mx-auto mt-8 text-center text-xs text-slate-400 border-t border-slate-200 pt-4 print:hidden">
+            Jazz Standard Solo Trainer &bull; Complete Full Tunes &amp; Beamed Bebop Etude Generator
+          </footer>
+        </div>
+      );
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      setupEventListeners();
-      renderFretboard();
-      generateSoloPhrase();
-    });
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
