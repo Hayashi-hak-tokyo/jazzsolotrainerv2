@@ -25,7 +25,7 @@
     .abcjs-highlight { fill: #2563eb !important; stroke: #2563eb !important; }
     .abcjs-tempo { display: none !important; }
 
-    /* コードネームと度数のフォント・位置 */
+    /* コードネームと度数注記の配置 */
     .abcjs-chord { font-size: 16px !important; font-weight: 800 !important; fill: #0f172a !important; }
     .abcjs-annotation { font-size: 11px !important; font-weight: 700 !important; fill: #b45309 !important; font-family: sans-serif !important; }
 
@@ -69,7 +69,7 @@
     const standardSongs = [
       {
         title: "Autumn Leaves",
-        key: "Gm", // 調号: Bb, Eb
+        key: "Gm", // Bb, Eb
         measures: 32,
         chords: [
           "Cm7", "F7", "Bbmaj7", "Ebmaj7", "Am7b5", "D7", "Gm7", "Gm7",
@@ -80,7 +80,7 @@
       },
       {
         title: "All The Things You Are",
-        key: "Ab", // 調号: Bb, Eb, Ab, Db
+        key: "Ab",
         measures: 36,
         chords: [
           "Fm7", "Bbm7", "Eb7", "Abmaj7", "Dbmaj7", "G7", "Cmaj7", "Cmaj7",
@@ -199,7 +199,7 @@
         }
       }, [abcjsLoaded, chords]);
 
-      // 譜面とTABのレンダリング（abcjs正規TABエンジン）
+      // レンダリング設定
       useEffect(() => {
         if (abcjsLoaded && abcString && window.ABCJS) {
           let tablatureOptions = [];
@@ -303,7 +303,7 @@
         const isMajor = type.includes('maj') || type.includes('M7') || type.includes('△');
         const isV7 = type.includes('7') && !isMinor && !isMajor && !isDim;
 
-        // 純粋コードトーン: R, 3, 5, 7
+        // 純粋コードトーン R, 3, 5, 7
         let chordIntervals = [0, isMinor ? 3 : 4, isDim ? 6 : 7, isMajor ? 11 : (type.includes('dim7') ? 9 : 10)];
 
         if (isV7) {
@@ -334,51 +334,6 @@
           case 11: return "△7";
           default: return "";
         }
-      };
-
-      // ギター開放弦（0フレット）を完全に禁止する弦の割り当て
-      // ギターチューニング: 1弦=64(E4), 2弦=59(B3), 3弦=55(G3), 4弦=50(D3), 5弦=45(A2), 6弦=40(E2)
-      const getNonOpenStringForGuitar = (midi) => {
-        const stringTunings = [
-          { s: 1, open: 64 },
-          { s: 2, open: 59 },
-          { s: 3, open: 55 },
-          { s: 4, open: 50 },
-          { s: 5, open: 45 },
-          { s: 6, open: 40 }
-        ];
-        // 0フレット（開放弦）を禁止し、1〜20フレットに収まる弦を選択
-        for (let t of stringTunings) {
-          const fret = midi - t.open;
-          if (fret >= 1 && fret <= 20) {
-            // 特に5〜15フレットの中域ボックスを優先
-            if (fret >= 4 && fret <= 15) return t.s;
-          }
-        }
-        for (let t of stringTunings) {
-          const fret = midi - t.open;
-          if (fret >= 1 && fret <= 20) return t.s;
-        }
-        return 1;
-      };
-
-      // 4弦ベース用（開放弦を禁止し、実音を1オクターブ下げて2〜12フレットに収める）
-      // ベースチューニング: 1弦=43(G2), 2弦=38(D2), 3弦=33(A1), 4弦=28(E1)
-      const getNonOpenStringForBass = (midi) => {
-        const bassMidi = midi - 12; // 8vb
-        const bassTunings = [
-          { s: 1, open: 43 },
-          { s: 2, open: 38 },
-          { s: 3, open: 33 },
-          { s: 4, open: 28 }
-        ];
-        for (let t of bassTunings) {
-          const fret = bassMidi - t.open;
-          if (fret >= 1 && fret <= 12) {
-            return t.s;
-          }
-        }
-        return 1;
       };
 
       // 調号に合致した音名変換（二重フラットを排除）
@@ -447,16 +402,18 @@
         return `[${r}${t}${s}]4 [${r}${t}${s}]4`;
       };
 
-      // エチュード生成エンジン（最高1弦20Fまで使用・開放弦0ゼロ・R,3,5,7特化）
+      // フレーズ生成エンジン（乱数による完全再生成・ジャズボキャブラリー・最高音1弦20F）
       const generateEtude = () => {
         let displayMelody = "";
         let audioMelody = "";
         let compingStr = "";
 
         const keySig = currentSong.key || "C";
-        // ★ギター音域ルール厳守: 最低音 6弦1F(F2=41) 〜 最高音 1弦20F(C6=84)
-        const SAFE_MIN = 48; // 5弦3F(C3)〜
-        const SAFE_MAX = 84; // 1弦20F(C6)
+        
+        // ★音域: ギターの開放弦ピッチ（40,45,50,55,59,64）を回避する安全域
+        // 最低音: 5弦3F(C3=48) / 4弦7F(A3=57) 〜 最高音: 1弦20F(C6=84)
+        const SAFE_MIN = 56;
+        const SAFE_MAX = 84;
 
         let lastPitch = -1;
 
@@ -475,13 +432,13 @@
           // ピアノ伴奏のみ
           compingStr += getPianoCompingAbc(firstChord, keySig, accComp) + " | ";
 
-          // コードトーン（R, 3, 5, 7）プール
+          // コードトーンのオクターブ展開プール（R, 3, 5, 7）
           let pool = [];
-          for (let oct = 3; oct <= 6; oct++) {
+          for (let oct = 4; oct <= 6; oct++) {
             chordInfo.scaleIntervals.forEach(interval => {
               const p = oct * 12 + interval;
-              // 48〜84（1弦20F）までしっかり活用
-              if (p >= SAFE_MIN && p <= SAFE_MAX) {
+              // 開放弦ピッチ（55, 59, 64）を物理除外
+              if (p >= SAFE_MIN && p <= SAFE_MAX && ![55, 59, 64].includes(p)) {
                 pool.push(p);
               }
             });
@@ -489,27 +446,68 @@
           pool = Array.from(new Set(pool)).sort((a,b) => a - b);
 
           let measurePitches = [];
-          let poolIdx = Math.floor(pool.length / 3);
+          
+          // ★再生成ボタンを押すたびにランダムに展開する4つのフレーズパターン
+          const phrasePattern = Math.floor(Math.random() * 4);
 
-          for (let b = 0; b < 8; b++) {
-            let nextP;
-            if (b < 4) {
-              poolIdx = (poolIdx + 1) % pool.length;
-              nextP = pool[poolIdx];
-            } else {
-              poolIdx = (poolIdx - 1 + pool.length) % pool.length;
-              nextP = pool[poolIdx];
+          if (phrasePattern === 0) {
+            // 【跳躍アルペジオ上昇からステップ下降】
+            let startIdx = Math.floor(Math.random() * Math.max(1, pool.length - 4));
+            for (let i = 0; i < 4; i++) {
+              measurePitches.push(pool[startIdx + i]);
             }
-
-            if (nextP === lastPitch) {
-              poolIdx = (poolIdx + 1) % pool.length;
-              nextP = pool[poolIdx];
+            // トップから跳躍または下降
+            let top = pool[startIdx + 3];
+            let lowerCandidates = pool.filter(n => n < top);
+            for (let i = 0; i < 4; i++) {
+              let nextP = lowerCandidates[lowerCandidates.length - 1 - (i % lowerCandidates.length)] || (top - 2);
+              measurePitches.push(nextP);
             }
-            lastPitch = nextP;
-            measurePitches.push(nextP);
+          } else if (phrasePattern === 1) {
+            // 【高音域（1弦15〜20F付近）からのダイナミック下降】
+            let highPool = pool.filter(n => n >= 72);
+            let topP = highPool.length > 0 ? highPool[Math.floor(Math.random() * highPool.length)] : pool[pool.length - 1];
+            measurePitches.push(topP);
+            
+            let cur = topP;
+            for (let i = 1; i < 8; i++) {
+              let downPool = pool.filter(n => n < cur);
+              if (downPool.length > 0) {
+                cur = downPool[downPool.length - 1];
+              } else {
+                cur = pool[pool.length - 1]; // 折り返し
+              }
+              measurePitches.push(cur);
+            }
+          } else if (phrasePattern === 2) {
+            // 【ピボット・インターバル（コードトーン同士の交互跳躍）】
+            let lowTones = pool.filter(n => n <= 67);
+            let highTones = pool.filter(n => n > 67);
+            for (let i = 0; i < 4; i++) {
+              let l = lowTones[i % lowTones.length] || pool[0];
+              let h = highTones[(i + 1) % highTones.length] || pool[pool.length - 1];
+              measurePitches.push(l);
+              measurePitches.push(h);
+            }
+          } else {
+            // 【ガイドトーン着地とボイスリーディング】
+            let curIdx = Math.floor(Math.random() * pool.length);
+            for (let i = 0; i < 8; i++) {
+              let step = (Math.random() < 0.6 ? 1 : -1) * (Math.random() < 0.7 ? 1 : 2);
+              curIdx = (curIdx + step + pool.length) % pool.length;
+              measurePitches.push(pool[curIdx]);
+            }
           }
 
-          // 2音ずつビームで連結し、弦番号を指定して開放弦0を完全に防止
+          // 同音重複の禁止フィルタ
+          for (let i = 0; i < measurePitches.length; i++) {
+            if (measurePitches[i] === lastPitch) {
+              measurePitches[i] = (measurePitches[i] + 2 <= SAFE_MAX) ? measurePitches[i] + 2 : measurePitches[i] - 2;
+            }
+            lastPitch = measurePitches[i];
+          }
+
+          // 2音ずつビームで束ねる（指番号の数字は一切付与しない）
           for (let i = 0; i < measurePitches.length; i += 2) {
             const p1 = measurePitches[i];
             const p2 = measurePitches[i + 1];
@@ -520,14 +518,10 @@
             const abc1 = midiToAbcByKey(p1, keySig, accV1);
             const abc2 = midiToAbcByKey(p2, keySig, accV1);
 
-            // 開放弦を阻止するための弦指定（例: !3! で3弦押弦）
-            const str1 = tabView === 'bass' ? getNonOpenStringForBass(p1) : getNonOpenStringForGuitar(p1);
-            const str2 = tabView === 'bass' ? getNonOpenStringForBass(p2) : getNonOpenStringForGuitar(p2);
-
             const annot1 = deg1 ? `^"${deg1}"` : "";
             const annot2 = deg2 ? `^"${deg2}"` : "";
 
-            displayMelody += `${annot1}!${str1}!${abc1}${annot2}!${str2}!${abc2} `;
+            displayMelody += `${annot1}${abc1}${annot2}${abc2} `;
             audioMelody += `${abc1}${abc2} `;
           }
 
@@ -588,7 +582,7 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Jazz Chord Tone Solo & TAB</h1>
-                  <p className="text-xs text-slate-500">コードトーン (R, 3, 5, 7) 特化・1弦20Fまで使用・開放弦ゼロ保証・ピアノ伴奏のみ</p>
+                  <p className="text-xs text-slate-500">コードトーン (R, 3, 5, 7) 特化・最高音20F・開放弦ゼロ保証・ピアノ伴奏のみ</p>
                 </div>
               </div>
 
@@ -606,7 +600,7 @@
                     onClick={() => setTabView('bass')}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${tabView === 'bass' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                   >
-                    ベースTAB併記 (8vb・2〜12F)
+                    ベースTAB併記 (8vb)
                   </button>
                   <button
                     onClick={() => setTabView('none')}
