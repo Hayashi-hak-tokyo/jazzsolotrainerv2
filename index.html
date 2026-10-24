@@ -185,16 +185,9 @@
       'C': []
     };
 
-    // ============================================================================
-    // ★ジャズ・ジャイアンツのフレーズ辞書（2拍セル＝1ハーフ小節単位）
-    // slots配列内の degreeIdx:
-    //   0 = Root, 1 = 3rd(or b3), 2 = 5th(or b5), 3 = 7th(or △7)
-    //   'alt1' = b9/#9, 'alt2' = #11/b13 (V7でオルタード/コンディミ選択時に自動適用)
-    //   octaveShift: 0 または +1 / -1
-    // ============================================================================
+    // ジャズ・ジャイアンツの2拍フレーズ辞書（前半：1〜2拍目）
     const JAZZ_GIANT_HALF_CELLS_BEAT12 = [
       {
-        // Charlie Parker: 8分休符（裏拍入り）から 3rd -> 5th -> 7th と駆け上がる定番ビバップ導入
         artist: "Charlie Parker (Offbeat Arpeggio)",
         pattern: "z_8_88",
         notes: [
@@ -204,7 +197,6 @@
         ]
       },
       {
-        // Wes Montgomery: 1拍目頭(3rd)から2拍目に「5th - 7th - 5th」の3連モルデント・ターン
         artist: "Wes Montgomery (Bebop Triplet Turn)",
         pattern: "88_trip",
         notes: [
@@ -216,7 +208,6 @@
         ]
       },
       {
-        // Sonny Rollins: 1拍目4分音符（ガイドトーン3rd）でしっかり歌い、2拍目8分2個で5th->7thへ
         artist: "Sonny Rollins (Guide Tone & Pickup)",
         pattern: "4_88",
         notes: [
@@ -226,7 +217,6 @@
         ]
       },
       {
-        // John Coltrane: 1-3-5-7 の王道デジタル・アルペジオ上昇
         artist: "John Coltrane (1-3-5-7 Digital Ascent)",
         pattern: "88_88",
         notes: [
@@ -237,7 +227,6 @@
         ]
       },
       {
-        // Clifford Brown: 7th -> 5th -> 3rd -> Root の流麗なアルペジオ下降
         artist: "Clifford Brown (7-5-3-1 Arpeggio Drop)",
         pattern: "88_88",
         notes: [
@@ -248,7 +237,6 @@
         ]
       },
       {
-        // Grant Green: 1拍目裏休符でシンコペーションし、2拍目裏から飛び出すファンキー・バップ
         artist: "Grant Green (Syncopated Hop)",
         pattern: "8z_z8",
         notes: [
@@ -258,10 +246,9 @@
       }
     ];
 
-    // 後半（3〜4拍目）：★必ず小節線を跨いで（Over-the-Barline）次の小節へ推進するジャイアンツ語彙
+    // ジャズ・ジャイアンツの2拍フレーズ辞書（後半：3〜4拍目 / Over-the-Barline）
     const JAZZ_GIANT_HALF_CELLS_BEAT34 = [
       {
-        // Charlie Parker: 3拍目に「3rd - 5th - 3rd」の美しいビバップ3連ターン -> 4拍目は Root -> 7th で次小節へ解決
         artist: "Charlie Parker (Bird Turn Over-the-Bar)",
         pattern: "trip_88",
         notes: [
@@ -273,7 +260,6 @@
         ]
       },
       {
-        // Sonny Stitt: 3拍目8分休符（ブレス）から裏拍で入り、4拍目8分2個で次小節のガイドトーンへ飛び込む
         artist: "Sonny Stitt (Breath & Drive)",
         pattern: "z8_88",
         notes: [
@@ -283,7 +269,6 @@
         ]
       },
       {
-        // Kenny Burrell: 3拍目〜4拍目を駆け抜ける 3rd -> 5th -> 7th -> 3rd(Oct) のスウィングライン
         artist: "Kenny Burrell (Swing Line Drive)",
         pattern: "88_88",
         notes: [
@@ -294,7 +279,6 @@
         ]
       },
       {
-        // Dizzy Gillespie: 3拍目8分2個から、4拍目に「R - 3rd - 5th」の3連アルペジオ・ロケットで小節線を突破
         artist: "Dizzy Gillespie (4th-Beat Triplet Rocket)",
         pattern: "88_trip",
         notes: [
@@ -306,7 +290,6 @@
         ]
       },
       {
-        // Bill Evans / Jim Hall: 3拍目を4分音符で溜め、4拍目の8分2個で次小節へ優雅に橋渡し
         artist: "Jim Hall (Lyrical Bridge)",
         pattern: "4_88",
         notes: [
@@ -317,22 +300,19 @@
       }
     ];
 
-    // V7（オルタード／コンディミ選択時）専用のジャズ・ジャイアンツ解決セル（3〜4拍目またはV7箇所）
+    // V7（オルタード／コンディミ選択時）専用のジャズ・ジャイアンツ解決セル
     const JAZZ_GIANT_V7_TENSION_CELLS = [
       {
-        // Bird Altered Line: b13 -> #9 -> b9 -> 3rd で次小節のトニック3度へ完璧に着地
         artist: "Charlie Parker (Altered Resolution)",
         pattern: "88_88",
         intervals: [8, 3, 1, 4] // b13, #9, b9, 3rd
       },
       {
-        // Coltrane H-W Dim / Altered Triplet: (3連: #9 - b9 - R) -> b7 -> 3rd
         artist: "John Coltrane (Tension Triplet Turn)",
         pattern: "trip_88",
         intervals: [3, 1, 0, 10, 4] // (3: #9, b9, R), b7, 3rd
       },
       {
-        // Wes Altered Pickup: z(裏入り) #11 -> b13 -> #9
         artist: "Wes Montgomery (Tritone Sub Line)",
         pattern: "z8_88",
         intervals: [6, 8, 3] // #11, b13, #9
@@ -398,8 +378,10 @@
               tuning: ['E,', 'A,', 'D', 'G', 'B', 'e']
             }];
           } else if (tabView === 'bass') {
+            // ★abcjsは instrument: 'guitar' でないとTABを描画しない仕様のため、
+            // エンジンには 'guitar' として渡して確実に描画させ、4本のベースチューニングを設定した上でSVGから下2本線を消去します
             tablatureOptions = [{
-              instrument: 'bass',
+              instrument: 'guitar',
               label: 'TAB (Bass 8vb)',
               tuning: ['E,', 'A,', 'D', 'G']
             }];
@@ -483,23 +465,34 @@
         }
       }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsLoaded, tabView, showDegrees]);
 
-      // TABのSVG補正（開放弦0排除・ベース4本線化・ボックス運指補正）
+      // ★TABのSVG補正（1. ベース時の確実な4本線化 / 2. 開放弦0の完全排除 / 3. 横移動を隣の弦のボックス運指へ変換）
       const refineTabSvg = (isBass) => {
         const svg = document.querySelector("#paper svg");
         if (!svg) return;
 
+        // ベースモード時、6本の横線が描かれていた場合は下2本を非表示にして4本線化
         if (isBass) {
-          const tabGroups = svg.querySelectorAll(".abcjs-tablature");
-          tabGroups.forEach(group => {
-            const horizLines = Array.from(group.querySelectorAll("line, path")).filter(el => {
+          const allPaths = Array.from(svg.querySelectorAll("path, line"));
+          // 横に長い譜面線を抽出（幅500px以上、高さ2px未満）
+          const staffLines = allPaths.filter(el => {
+            try {
               const box = el.getBBox();
-              return box.width > 200 && box.height < 3;
-            });
-            if (horizLines.length === 6) {
-              horizLines[4].style.display = "none";
-              horizLines[5].style.display = "none";
+              return box.width > 400 && box.height < 2;
+            } catch (e) {
+              return false;
             }
           });
+
+          // Y座標順に並べて、各システム（五線5本＋TAB線）をグループ化
+          staffLines.sort((a, b) => a.getBBox().y - b.getBBox().y);
+
+          // 1システムあたり五線(5本) + TAB(6本) = 11本ある場合、各システムの最後の2本（10本目・11本目）を隠す
+          if (staffLines.length > 0 && staffLines.length % 11 === 0) {
+            for (let i = 0; i < staffLines.length; i += 11) {
+              if (staffLines[i + 9]) staffLines[i + 9].style.display = "none";
+              if (staffLines[i + 10]) staffLines[i + 10].style.display = "none";
+            }
+          }
         }
 
         const allTabTexts = svg.querySelectorAll(".abcjs-tablature text, g.abcjs-tab-number text");
@@ -519,11 +512,11 @@
             txt.textContent = "5";
             txt.setAttribute("y", (curY + 7.5).toString());
           }
-          // 2. ベースTABで10フレット以上のハイフレット横移動が出た場合 -> 弦移動へ変換
-          else if (isBass && num >= 10) {
+          // 2. ベースTABで9フレット以上のハイフレット横移動が出た場合 -> 弦を跨いだボックス運指に変換
+          else if (isBass && num >= 9) {
             let shiftedFret = num - 5;
             let shiftedY = curY - 7.5;
-            if (shiftedFret >= 10) {
+            if (shiftedFret >= 9) {
               shiftedFret -= 5;
               shiftedY -= 7.5;
             }
@@ -545,7 +538,6 @@
         const isMajor = type.includes('maj') || type.includes('M7') || type.includes('△');
         const isV7 = type.includes('7') && !isMinor && !isMajor && !isDim;
 
-        // 4つの基本コードトーン [Root, 3rd, 5th, 7th] の半音オフセット
         const basicOffsets = [
           0,
           isMinor || isDim ? 3 : 4,
@@ -642,7 +634,7 @@
         return `[${r}${t}${s}]${beats}`;
       };
 
-      // ★ジャズ・ジャイアンツのフレーズ（Lick Cells）をボイスリーディング連結する生成エンジン
+      // ジャズ・ジャイアンツのフレーズ（Lick Cells）をボイスリーディング連結する生成エンジン
       const generateEtude = () => {
         let fullLines = [];
         let audioMelody = "";
@@ -656,9 +648,7 @@
 
         let prevPitch = 64;
 
-        // コード情報とジャズ・ジャイアンツのセル定義から、前の音域に最も自然に繋がるオクターブを計算してABC化する関数
         const realizeGiantCell = (cell, chordInfo, accRef, degreeTokensOut) => {
-          // 現在のprevPitchに最も近い基準オクターブ（baseMidi）を決定
           let bestBaseOctave = 60;
           let minDistance = 999;
           for (let octBase of [48, 60, 72]) {
@@ -672,10 +662,8 @@
 
           let renderedNotes = [];
 
-          // V7専用テンションセルの場合
           if (cell.intervals) {
             cell.intervals.forEach(semi => {
-              // コンディミ選択時は b13(8) を 13(9) または 5th(7) に補正
               let actualSemi = semi;
               if (v7Approach === 'condim' && semi === 8) actualSemi = 9;
 
@@ -691,7 +679,6 @@
               renderedNotes.push(abc);
             });
           } else {
-            // 純粋コードトーンセル (R, 3, 5, 7) の場合
             cell.notes.forEach(nSpec => {
               const semi = chordInfo.basicOffsets[nSpec.degIdx];
               let p = bestBaseOctave + chordInfo.rootPitch + semi + (nSpec.oct * 12);
@@ -706,7 +693,6 @@
             });
           }
 
-          // リズムパターンに応じたABCフォーマット（ダサいランダム3連ではなく、ジャイアンツ本物の3連ターン・アルペジオ！）
           switch (cell.pattern) {
             case "z_8_88":
               return `z${renderedNotes[0]} ${renderedNotes[1]}${renderedNotes[2]}`;
@@ -739,7 +725,6 @@
           let accV1 = {};
           let accComp = {};
 
-          // ピアノ伴奏
           if (hasTwoChords) {
             compingStr += `${getPianoVoicing(chord1, keySig, accComp, 4)} ${getPianoVoicing(chord2, keySig, accComp, 4)} | `;
           } else {
@@ -751,8 +736,7 @@
           let half2Str = hasTwoChords ? `"${chord2}"` : "";
 
           if (m === measureCount - 1) {
-            // 最終小節：Charlie Parkerのターンからルート全音符（または2分音符）へ解決
-            const endCell = JAZZ_GIANT_HALF_CELLS_BEAT34[0]; // Bird Turn
+            const endCell = JAZZ_GIANT_HALF_CELLS_BEAT34[0];
             half1Str += realizeGiantCell(endCell, info1, accV1, degreeTokens) + " ";
 
             let finalRoot = 60 + info2.rootPitch;
@@ -761,11 +745,9 @@
             degreeTokens.push("R");
             half2Str += `${finalAbc}4`;
           } else {
-            // 前半（1〜2拍目）：ジャズ・ジャイアンツの導入・展開セルから選択
             const cell1 = JAZZ_GIANT_HALF_CELLS_BEAT12[Math.floor(Math.random() * JAZZ_GIANT_HALF_CELLS_BEAT12.length)];
             half1Str += realizeGiantCell(cell1, info1, accV1, degreeTokens) + " ";
 
-            // 後半（3〜4拍目）：V7でオルタード/コンディミが選ばれている場合はジャイアンツのV7テンション解決セルを使用
             let cell2;
             if (info2.isV7 && v7Approach !== 'chordtone') {
               cell2 = JAZZ_GIANT_V7_TENSION_CELLS[Math.floor(Math.random() * JAZZ_GIANT_V7_TENSION_CELLS.length)];
