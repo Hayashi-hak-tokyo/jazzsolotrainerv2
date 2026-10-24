@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Solo Etude & Degree TAB Generator</title>
+  <title>Jazz Solo Etude - Score & TAB</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -12,7 +12,7 @@
 
   <style>
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
@@ -87,7 +87,7 @@
       }
     ];
 
-    const PITCH_MAP = {
+    const PITCH_OFFSETS = {
       'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
       'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8,
       'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
@@ -102,13 +102,12 @@
       const [viewMode, setViewMode] = useState("guitar"); // score, guitar, bass
       const [isBackingOnly, setIsBackingOnly] = useState(false);
       const [isPlaying, setIsPlaying] = useState(false);
-      const [activeNoteIdx, setActiveNoteIdx] = useState(-1);
-      const [generatedScore, setGeneratedScore] = useState([]);
+      const [activeNoteId, setActiveNoteId] = useState(null);
+      const [scoreData, setScoreData] = useState([]);
       const [isModalOpen, setIsModalOpen] = useState(false);
 
       const audioCtxRef = useRef(null);
       const timerRef = useRef(null);
-      const scoreRef = useRef([]);
 
       // 初期化
       useEffect(() => {
@@ -122,16 +121,16 @@
 
       useEffect(() => {
         if (chords[0] !== "") {
-          generateEtude();
+          generateSolo();
         }
       }, [chords, v7Approach]);
 
-      // 和音・度数判定
-      const analyzeNoteDegree = (midi, chordStr) => {
-        if (!chordStr) return { label: "CT", isChordTone: true, isAltered: false };
+      // 度数解析（コードトーン、テンション、アプローチ）
+      const getDegree = (midi, chordStr) => {
+        if (!chordStr) return { label: "CT", isCT: true, isAlt: false };
         const match = chordStr.match(/^[A-G][#b]?/);
         const root = match ? match[0] : 'C';
-        const rootMidi = PITCH_MAP[root] || 0;
+        const rootMidi = PITCH_OFFSETS[root] || 0;
         const interval = (midi % 12 - rootMidi + 12) % 12;
         const type = chordStr.substring(root.length);
 
@@ -139,56 +138,55 @@
         const isDim = type.includes('dim') || type.includes('m7b5');
         const isV7 = type.includes('7') && !isMinor && !type.includes('maj');
 
-        if (interval === 0) return { label: "Root", isChordTone: true, isAltered: false };
-        if (interval === 4 && !isMinor) return { label: "3rd", isChordTone: true, isAltered: false };
-        if (interval === 3 && isMinor) return { label: "3rd", isChordTone: true, isAltered: false };
-        if (interval === 7 && !isDim) return { label: "5th", isChordTone: true, isAltered: false };
-        if (interval === 6 && isDim) return { label: "b5", isChordTone: true, isAltered: false };
-        if (interval === 10 && (isV7 || isMinor || isDim)) return { label: "7th", isChordTone: true, isAltered: false };
-        if (interval === 11 && !isV7 && !isMinor) return { label: "7th", isChordTone: true, isAltered: false };
+        if (interval === 0) return { label: "Root", isCT: true, isAlt: false };
+        if (interval === 4 && !isMinor) return { label: "3rd", isCT: true, isAlt: false };
+        if (interval === 3 && isMinor) return { label: "3rd", isCT: true, isAlt: false };
+        if (interval === 7 && !isDim) return { label: "5th", isCT: true, isAlt: false };
+        if (interval === 6 && isDim) return { label: "b5", isCT: true, isAlt: false };
+        if (interval === 10 && (isV7 || isMinor || isDim)) return { label: "7th", isCT: true, isAlt: false };
+        if (interval === 11 && !isV7 && !isMinor) return { label: "7th", isCT: true, isAlt: false };
 
-        // テンション & オルタード
         if (isV7) {
-          if (interval === 1) return { label: "b9", isChordTone: false, isAltered: true };
-          if (interval === 3) return { label: "#9", isChordTone: false, isAltered: true };
-          if (interval === 6) return { label: "#11", isChordTone: false, isAltered: true };
-          if (interval === 8) return { label: "b13", isChordTone: false, isAltered: true };
-          if (interval === 2) return { label: "9th", isChordTone: false, isAltered: false };
-          if (interval === 9) return { label: "13th", isChordTone: false, isAltered: false };
+          if (interval === 1) return { label: "b9", isCT: false, isAlt: true };
+          if (interval === 3) return { label: "#9", isCT: false, isAlt: true };
+          if (interval === 6) return { label: "#11", isCT: false, isAlt: true };
+          if (interval === 8) return { label: "b13", isCT: false, isAlt: true };
+          if (interval === 2) return { label: "9th", isCT: false, isAlt: false };
+          if (interval === 9) return { label: "13th", isCT: false, isAlt: false };
         } else {
-          if (interval === 2) return { label: "9th", isChordTone: false, isAltered: false };
-          if (interval === 5) return { label: "11th", isChordTone: false, isAltered: false };
-          if (interval === 9) return { label: "13th", isChordTone: false, isAltered: false };
+          if (interval === 2) return { label: "9th", isCT: false, isAlt: false };
+          if (interval === 5) return { label: "11th", isCT: false, isAlt: false };
+          if (interval === 9) return { label: "13th", isCT: false, isAlt: false };
         }
 
-        return { label: "appr", isChordTone: false, isAltered: false };
+        return { label: "appr", isCT: false, isAlt: false };
       };
 
-      // TABポジション計算 (ギター & 4弦ベース8vb)
-      const calculateTabPos = (midi, isBass) => {
+      // TABポジション算出（ギター: 6弦, ベース: 4弦 8vb下げ）
+      const getTabPosition = (midi, isBass) => {
+        if (!midi) return null;
         if (isBass) {
-          // ベース用: 実音ピッチを変えずにTABのみ1オクターブ下 (8vb) で計算
+          // 実音ピッチを変えずにTAB譜のみ1オクターブ下げ（8vb）で計算
           const target = midi - 12;
-          const bassTunings = [43, 38, 33, 28]; // G2, D2, A1, E1
+          const bassTunings = [43, 38, 33, 28]; // 1弦=G2(43), 2弦=D2(38), 3弦=A1(33), 4弦=E1(28)
           for (let s = 0; s < bassTunings.length; s++) {
             const fret = target - bassTunings[s];
-            if (fret >= 0 && fret <= 18) {
+            if (fret >= 0 && fret <= 17) {
               return { string: s + 1, fret };
             }
           }
           return { string: 1, fret: Math.max(0, target - 43) };
         } else {
-          // ギター標準チューニング E4=64, B3=59, G3=55, D3=50, A2=45, E2=40
+          // ギター: 1弦=E4(64), 2弦=B3(59), 3弦=G3(55), 4弦=D3(50), 5弦=A2(45), 6弦=E2(40)
           const guitarTunings = [64, 59, 55, 50, 45, 40];
-          // 5〜15フレットの中域ポジションを優先
           let best = null;
-          let bestScore = 999;
+          let minDiff = 999;
           for (let s = 0; s < guitarTunings.length; s++) {
             const fret = midi - guitarTunings[s];
-            if (fret >= 0 && fret <= 21) {
-              const score = Math.abs(fret - 8);
-              if (score < bestScore) {
-                bestScore = score;
+            if (fret >= 0 && fret <= 20) {
+              const diff = Math.abs(fret - 7); // 5〜10フレットの中央ポジションを優先
+              if (diff < minDiff) {
+                minDiff = diff;
                 best = { string: s + 1, fret };
               }
             }
@@ -197,11 +195,11 @@
         }
       };
 
-      // フレーズ生成エンジン
-      const generateEtude = () => {
+      // フレーズ生成（2オクターブ跳躍・意味のある3連符）
+      const generateSolo = () => {
         let measures = [];
-        let globalNoteCounter = 0;
-        let currentPitch = 62; // D4
+        let noteIdCounter = 0;
+        let curMidi = 62; // D4
 
         const MIN_NOTE = 50; // D3
         const MAX_NOTE = 81; // A5
@@ -211,14 +209,14 @@
           const chordList = chordStr.split(/\s+/).filter(c => c.length > 0);
           const firstChord = chordList[0] || "Cmaj7";
           const match = firstChord.match(/^[A-G][#b]?/);
-          const rootMidi = match ? (PITCH_MAP[match[0]] || 0) : 0;
+          const rootMidi = match ? (PITCH_OFFSETS[match[0]] || 0) : 0;
           const isV7 = firstChord.includes('7') && !firstChord.includes('maj') && !firstChord.includes('m');
 
           let notes = [];
-          const patternType = m % 4;
+          const pattern = m % 4;
 
-          if (patternType === 0) {
-            // 【急上昇アルペジオ】低域からハイポジションへ駆け上がり
+          if (pattern === 0) {
+            // 【急上昇アルペジオ】低域から2オクターブ近く一気に駆け上がる
             let p = 50 + rootMidi;
             while (p < 52) p += 12;
             while (p > 60) p -= 12;
@@ -226,91 +224,87 @@
             for (let i = 0; i < 6; i++) {
               p += (i % 2 === 0 ? 4 : 3);
               if (p > MAX_NOTE) p -= 12;
-              const info = analyzeNoteDegree(p, firstChord);
-              notes.push({ midi: p, isTrip: false, dur: 1, chord: firstChord, ...info, id: globalNoteCounter++ });
+              notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
             }
-            // 下降ステップ
             p -= 2;
-            notes.push({ midi: p, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(p, firstChord), id: globalNoteCounter++ });
+            notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
             p -= 1;
-            notes.push({ midi: p, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(p, firstChord), id: globalNoteCounter++ });
-            currentPitch = p;
+            notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
+            curMidi = p;
 
-          } else if (patternType === 1) {
+          } else if (pattern === 1) {
             // 【ビバップ・ターン3連符 & 下降スケール】
-            const target = currentPitch;
-            // 3連符 (上 -> 原音 -> 半音下)
-            notes.push({ midi: target + 1, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(target + 1, firstChord), id: globalNoteCounter++ });
-            notes.push({ midi: target, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(target, firstChord), id: globalNoteCounter++ });
-            notes.push({ midi: target - 1, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(target - 1, firstChord), id: globalNoteCounter++ });
-            
+            const target = curMidi;
+            // 3連符 (上 -> 原音 -> 下)
+            notes.push({ midi: target + 1, isTrip: true, ...getDegree(target + 1, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: target, isTrip: true, ...getDegree(target, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: target - 1, isTrip: true, ...getDegree(target - 1, firstChord), id: noteIdCounter++ });
+
             let p = target - 1;
             for (let i = 0; i < 5; i++) {
               p -= (i % 2 === 0 ? 2 : 1);
               if (p < MIN_NOTE) p += 12;
-              notes.push({ midi: p, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(p, firstChord), id: globalNoteCounter++ });
+              notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
             }
-            currentPitch = p;
+            curMidi = p;
 
-          } else if (patternType === 2) {
-            // 【V7オルタード／コンディミ解決 & エンクロージャー】
+          } else if (pattern === 2) {
+            // 【V7オルタード/コンディミ解決 & エンクロージャー】
             if (isV7) {
               const tension = v7Approach === 'altered' ? (60 + rootMidi + 1) : (60 + rootMidi + 3); // b9 or #9
-              notes.push({ midi: tension, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(tension, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: tension - 1, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(tension - 1, firstChord), id: globalNoteCounter++ });
-              
+              notes.push({ midi: tension, isTrip: false, ...getDegree(tension, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: tension - 1, isTrip: false, ...getDegree(tension - 1, firstChord), id: noteIdCounter++ });
+
               const third = 60 + rootMidi + 4; // 3rd
-              notes.push({ midi: third + 1, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(third + 1, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: third - 1, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(third - 1, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: third, isTrip: false, dur: 2, chord: firstChord, ...analyzeNoteDegree(third, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: null, isTrip: false, dur: 2, chord: firstChord, label: "", isChordTone: false, id: globalNoteCounter++ }); // 休符
-              currentPitch = third;
+              notes.push({ midi: third + 1, isTrip: false, ...getDegree(third + 1, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: third - 1, isTrip: false, ...getDegree(third - 1, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: third, isTrip: false, ...getDegree(third, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: null, isTrip: false, label: "", isCT: false, id: noteIdCounter++ }); // 休符
+              curMidi = third;
             } else {
               // 3連アルペジオ
-              let p = currentPitch;
-              notes.push({ midi: p, isTrip: false, dur: 2, chord: firstChord, ...analyzeNoteDegree(p, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: p + 3, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(p + 3, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: p + 7, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(p + 7, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: p + 10, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(p + 10, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: p + 12, isTrip: false, dur: 2, chord: firstChord, ...analyzeNoteDegree(p + 12, firstChord), id: globalNoteCounter++ });
-              notes.push({ midi: null, isTrip: false, dur: 1, chord: firstChord, label: "", isChordTone: false, id: globalNoteCounter++ });
-              currentPitch = p + 12;
+              let p = curMidi;
+              notes.push({ midi: p, isTrip: false, ...getDegree(p, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p + 3, isTrip: true, ...getDegree(p + 3, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p + 7, isTrip: true, ...getDegree(p + 7, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p + 10, isTrip: true, ...getDegree(p + 10, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: p + 12, isTrip: false, ...getDegree(p + 12, firstChord), id: noteIdCounter++ });
+              notes.push({ midi: null, isTrip: false, label: "", isCT: false, id: noteIdCounter++ });
+              curMidi = p + 12;
             }
 
           } else {
-            // 【最大2オクターブ跳躍からのクロマチック】
-            let jump = currentPitch < 66 ? currentPitch + 14 : currentPitch - 14;
+            // 【ワイド・跳躍 & クロマチック】
+            let jump = curMidi < 66 ? curMidi + 14 : curMidi - 14;
             if (jump > MAX_NOTE) jump -= 12;
             if (jump < MIN_NOTE) jump += 12;
 
-            notes.push({ midi: currentPitch, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(currentPitch, firstChord), id: globalNoteCounter++ });
-            notes.push({ midi: jump, isTrip: false, dur: 1, chord: firstChord, ...analyzeNoteDegree(jump, firstChord), id: globalNoteCounter++ });
-            
-            // 3連クロマチック下降
-            notes.push({ midi: jump - 1, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(jump - 1, firstChord), id: globalNoteCounter++ });
-            notes.push({ midi: jump - 2, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(jump - 2, firstChord), id: globalNoteCounter++ });
-            notes.push({ midi: jump - 3, isTrip: true, dur: 0.333, chord: firstChord, ...analyzeNoteDegree(jump - 3, firstChord), id: globalNoteCounter++ });
+            notes.push({ midi: curMidi, isTrip: false, ...getDegree(curMidi, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: jump, isTrip: false, ...getDegree(jump, firstChord), id: noteIdCounter++ });
 
-            notes.push({ midi: jump - 4, isTrip: false, dur: 2, chord: firstChord, ...analyzeNoteDegree(jump - 4, firstChord), id: globalNoteCounter++ });
-            notes.push({ midi: null, isTrip: false, dur: 1, chord: firstChord, label: "", isChordTone: false, id: globalNoteCounter++ });
-            currentPitch = jump - 4;
+            notes.push({ midi: jump - 1, isTrip: true, ...getDegree(jump - 1, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: jump - 2, isTrip: true, ...getDegree(jump - 2, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: jump - 3, isTrip: true, ...getDegree(jump - 3, firstChord), id: noteIdCounter++ });
+
+            notes.push({ midi: jump - 4, isTrip: false, ...getDegree(jump - 4, firstChord), id: noteIdCounter++ });
+            notes.push({ midi: null, isTrip: false, label: "", isCT: false, id: noteIdCounter++ });
+            curMidi = jump - 4;
           }
 
-          measures.push({ measureIdx: m + 1, chord: chordStr, notes });
+          measures.push({ measureNumber: m + 1, chord: chordStr, notes });
         }
 
-        setGeneratedScore(measures);
-        scoreRef.current = measures;
+        setScoreData(measures);
       };
 
-      // Web Audio スウィング伴奏 ＆ ソロ再生エンジン
-      const stopAudio = () => {
-        if (timerRef.current) clearInterval(timerRef.current);
+      // オーディオ再生
+      const stopPlay = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
         setIsPlaying(false);
-        setActiveNoteIdx(-1);
+        setActiveNoteId(null);
       };
 
-      const startAudio = () => {
+      const startPlay = () => {
         if (!audioCtxRef.current) {
           audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
         }
@@ -318,25 +312,22 @@
         if (ctx.state === 'suspended') ctx.resume();
 
         setIsPlaying(true);
-        const beatDur = 60 / bpm;
-        const swingLong = beatDur * 0.62;
-        const swingShort = beatDur * 0.38;
+        const beatSec = 60 / bpm;
+        const swingLong = beatSec * 0.62;
+        const swingShort = beatSec * 0.38;
 
         let flatNotes = [];
-        scoreRef.current.forEach(m => {
-          m.notes.forEach(n => flatNotes.push(n));
-        });
+        scoreData.forEach(m => m.notes.forEach(n => flatNotes.push(n)));
 
-        let curIdx = 0;
-        const playStep = () => {
-          if (curIdx >= flatNotes.length) {
-            stopAudio();
+        let idx = 0;
+        const playNext = () => {
+          if (idx >= flatNotes.length) {
+            stopPlay();
             return;
           }
-          const n = flatNotes[curIdx];
-          setActiveNoteIdx(n.id);
+          const n = flatNotes[idx];
+          setActiveNoteId(n.id);
 
-          // ギター実音再生 (マイナスワン時はミュート)
           if (!isBackingOnly && n.midi) {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -344,21 +335,21 @@
             const freq = 440 * Math.pow(2, (n.midi - 69) / 12);
             osc.frequency.setValueAtTime(freq, ctx.currentTime);
 
-            gain.gain.setValueAtTime(0.2, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + beatDur * 0.85);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + beatSec * 0.85);
 
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start();
-            osc.stop(ctx.currentTime + beatDur * 0.9);
+            osc.stop(ctx.currentTime + beatSec * 0.9);
           }
 
-          curIdx++;
-          const nextDur = n.isTrip ? (beatDur / 3) * 1000 : (curIdx % 2 === 1 ? swingLong * 1000 : swingShort * 1000);
-          timerRef.current = setTimeout(playStep, nextDur);
+          idx++;
+          const duration = n.isTrip ? (beatSec / 3) * 1000 : (idx % 2 === 1 ? swingLong * 1000 : swingShort * 1000);
+          timerRef.current = setTimeout(playNext, duration);
         };
 
-        playStep();
+        playNext();
       };
 
       const selectSong = (song) => {
@@ -457,7 +448,7 @@
 
               <div className="flex flex-col justify-end">
                 <button
-                  onClick={generateEtude}
+                  onClick={generateSolo}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition active:scale-[0.98] flex items-center justify-center gap-2"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21v-5h5"></path></svg>
@@ -466,18 +457,18 @@
               </div>
             </div>
 
-            {/* 凡例バー */}
+            {/* 凡例 & プレイヤーバー */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-5 py-3 rounded-xl border border-slate-200 text-xs font-semibold print:hidden">
               <div className="flex items-center gap-5">
-                <span className="text-slate-500">度数表記カラー:</span>
+                <span className="text-slate-500">度数カラー:</span>
                 <span className="flex items-center gap-1.5 text-amber-600">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> コードトーン (Root, 3, 5, 7)
                 </span>
                 <span className="flex items-center gap-1.5 text-blue-600">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> テンション / オルタード (b9, #9, #11, b13, 9, 13)
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> テンション/オルタード (b9, #9, #11, b13, 9, 13)
                 </span>
                 <span className="flex items-center gap-1.5 text-slate-500">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span> アプローチ・経過音 (appr)
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span> アプローチ (appr)
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -488,10 +479,10 @@
                     onChange={(e) => setIsBackingOnly(e.target.checked)}
                     className="w-4 h-4 text-blue-600 rounded"
                   />
-                  <span>マイナスワン (伴奏のみ)</span>
+                  <span>伴奏のみ再生</span>
                 </label>
                 <button
-                  onClick={isPlaying ? stopAudio : startAudio}
+                  onClick={isPlaying ? stopPlay : startPlay}
                   className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${isPlaying ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}
                 >
                   {isPlaying ? '停止' : '再生 / 練習'}
@@ -502,9 +493,8 @@
             {/* 楽譜 & TAB描画エンジン (HTML5 SVG) */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 overflow-x-auto print:border-none print:shadow-none custom-scrollbar">
               <div className="min-w-[760px] space-y-8">
-                {/* 4小節ごとに1行 (System) */}
-                {Array.from({ length: Math.ceil(generatedScore.length / 4) }).map((_, systemIdx) => {
-                  const systemMeasures = generatedScore.slice(systemIdx * 4, systemIdx * 4 + 4);
+                {Array.from({ length: Math.ceil(scoreData.length / 4) }).map((_, systemIdx) => {
+                  const systemMeasures = scoreData.slice(systemIdx * 4, systemIdx * 4 + 4);
                   const isBass = viewMode === 'bass';
                   const isScore = viewMode === 'score';
                   const lineCount = isScore ? 5 : (isBass ? 4 : 6);
@@ -515,7 +505,7 @@
                   return (
                     <div key={systemIdx} className="relative bg-white border-b border-slate-100 pb-6">
                       <svg width="100%" height={totalHeight} viewBox={`0 0 840 ${totalHeight}`} className="overflow-visible">
-                        {/* 譜面線 (五線 / TAB 6本 / TAB 4本) */}
+                        {/* 譜面線 (五線 / ギター6本 / ベース4本) */}
                         {Array.from({ length: lineCount }).map((_, l) => (
                           <line
                             key={l}
@@ -552,12 +542,12 @@
                           </g>
                         )}
 
-                        {/* 各小節の内容 */}
+                        {/* 各小節 */}
                         {systemMeasures.map((measure, mIdx) => {
                           const measureLeft = 20 + mIdx * 200;
                           return (
                             <g key={mIdx}>
-                              {/* コード進行名 */}
+                              {/* コード名 */}
                               <text
                                 x={measureLeft + 15}
                                 y={22}
@@ -575,13 +565,13 @@
                                 fill="#94a3b8"
                                 textAnchor="end"
                               >
-                                {measure.measureIdx}
+                                {measure.measureNumber}
                               </text>
 
-                              {/* 各音符と度数ラベル・TAB数字 */}
+                              {/* 各音符 */}
                               {measure.notes.map((note, nIdx) => {
                                 const noteX = measureLeft + 30 + nIdx * 20;
-                                const isHighlight = activeNoteIdx === note.id;
+                                const isHighlight = activeNoteId === note.id;
 
                                 if (!note.midi) {
                                   // 休符
@@ -592,15 +582,13 @@
                                   );
                                 }
 
-                                const pos = calculateTabPos(note.midi, isBass);
+                                const pos = getTabPosition(note.midi, isBass);
                                 const tabY = staffTop + (pos.string - 1) * lineHeight;
-
-                                // 度数ラベルの配色
-                                const labelColor = note.isChordTone ? "#d97706" : (note.isAltered ? "#2563eb" : "#64748b");
+                                const labelColor = note.isCT ? "#d97706" : (note.isAlt ? "#2563eb" : "#64748b");
 
                                 return (
                                   <g key={nIdx}>
-                                    {/* 素晴らしい度数表記ラベル */}
+                                    {/* 度数表記ラベル */}
                                     <text
                                       x={noteX}
                                       y={staffTop - 12}
@@ -613,14 +601,14 @@
                                       {note.label}
                                     </text>
 
-                                    {/* 3連符表示 */}
+                                    {/* 3連符 */}
                                     {note.isTrip && (
                                       <text x={noteX} y={staffTop - 2} fontSize="8" fill="#3b82f6" textAnchor="middle" fontWeight="bold">
                                         3
                                       </text>
                                     )}
 
-                                    {/* TAB数字描画 */}
+                                    {/* TAB数字 or 五線譜音符 */}
                                     {!isScore ? (
                                       <g>
                                         <rect
@@ -644,7 +632,6 @@
                                         </text>
                                       </g>
                                     ) : (
-                                      /* 五線譜の音符 */
                                       <g>
                                         <circle
                                           cx={noteX}
@@ -690,855 +677,6 @@
                     <button
                       key={idx}
                       onClick={() => selectSong(song)}
-                      className="w-full text-left px-4 py-2.5 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition flex justify-between items-center group text-xs font-semibold text-slate-700"
-                    >
-                      <span>{song.title}</span>
-                      <span className="text-[11px] px-2 py-0.5 bg-slate-100 group-hover:bg-blue-100 text-slate-500 group-hover:text-blue-700 rounded-md">
-                        {song.measures} 小節
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Standard Solo Etude Generator</title>
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-  
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-audio.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-basic-min.js"></script>
-
-  <style>
-    .abcjs-css-warning { display: none !important; }
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    
-    .abcjs-note { fill: #1e293b; }
-    .abcjs-staff { fill: #1e293b; }
-    .abcjs-highlight { fill: #2563eb !important; }
-    .abcjs-tempo { display: none !important; }
-    
-    #paper { padding-bottom: 20px; }
-    #paper svg { 
-      overflow: visible !important; 
-      margin-bottom: 20px !important; 
-      width: 100% !important;
-      height: auto !important;
-    }
-
-    .abcjs-inline-audio { margin: 0; padding: 10px; display: flex; align-items: center; gap: 8px; justify-content: center; }
-    .abcjs-inline-audio .abcjs-btn {
-       background-color: #f1f5f9 !important;
-       border: 1px solid #cbd5e1 !important;
-       border-radius: 8px !important;
-       color: #334155 !important;
-       width: 36px !important;
-       height: 36px !important;
-       cursor: pointer;
-       display: inline-flex !important;
-       align-items: center;
-       justify-content: center;
-       margin: 0 4px;
-       padding: 0 !important;
-    }
-    .abcjs-inline-audio .abcjs-btn:hover {
-       background-color: #e2e8f0 !important;
-    }
-    .abcjs-inline-audio .abcjs-btn svg {
-       width: 18px !important;
-       height: 18px !important;
-       fill: #334155 !important;
-    }
-  </style>
-</head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased">
-  <div id="root"></div>
-
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
-
-    const standardSongs = [
-      {
-        title: "Autumn Leaves",
-        measures: 32,
-        chords: [
-          "Cm7", "F7", "Bbmaj7", "Ebmaj7", "Am7b5", "D7", "Gm7", "Gm7",
-          "Cm7", "F7", "Bbmaj7", "Ebmaj7", "Am7b5", "D7", "Gm7", "Gm7",
-          "Am7b5", "D7", "Gm7", "Gm7", "Cm7", "F7", "Bbmaj7", "Ebmaj7",
-          "Am7b5", "D7", "Gm7 C7", "Fm7 Bb7", "Ebmaj7", "Am7b5 D7", "Gm7", "Gm7"
-        ]
-      },
-      {
-        title: "All The Things You Are",
-        measures: 36,
-        chords: [
-          "Fm7", "Bbm7", "Eb7", "Abmaj7", "Dbmaj7", "G7", "Cmaj7", "Cmaj7",
-          "Cm7", "Fm7", "Bb7", "Ebmaj7", "Abmaj7", "D7", "Gmaj7", "Gmaj7",
-          "Am7", "D7", "Gmaj7", "Gmaj7", "F#m7b5", "B7", "Emaj7", "C7#5",
-          "Fm7", "Bbm7", "Eb7", "Abmaj7", "Dbmaj7", "Dbm7", "Cm7", "Bdim7",
-          "Bbm7", "Eb7", "Abmaj7", "Abmaj7"
-        ]
-      },
-      {
-        title: "Donna Lee",
-        measures: 32,
-        chords: [
-          "Abmaj7", "Abmaj7", "F7", "F7", "Bbm7", "Bbm7", "Bb7", "Bb7",
-          "Bbm7", "Eb7", "Abmaj7", "F7", "Bbm7", "C7", "Fm7", "C7",
-          "Fm7", "Fm7", "C7", "C7", "Fm7", "Fm7", "Eb7", "Eb7",
-          "Abmaj7", "Abmaj7", "F7", "F7", "Bbm7", "Edim7", "Abmaj7 F7", "Bbm7 Eb7"
-        ]
-      },
-      {
-        title: "Stella by Starlight",
-        measures: 32,
-        chords: [
-          "Em7b5", "A7", "Cm7", "F7", "Fm7", "Bb7", "Ebmaj7", "Ebmaj7",
-          "Ab7", "Ab7", "Bbmaj7", "Bbmaj7", "Em7b5", "A7", "Dm7", "Dm7",
-          "Bbm7", "Eb7", "Fmaj7", "Fmaj7", "Em7b5", "A7", "Am7b5", "D7",
-          "G7", "G7", "Cm7", "Cm7", "Ab7", "Ab7", "Bbmaj7", "Bbmaj7"
-        ]
-      },
-      {
-        title: "There Will Never Be Another You",
-        measures: 32,
-        chords: [
-          "Ebmaj7", "Ebmaj7", "Dm7b5", "G7", "Cm7", "Cm7", "Bbm7", "Eb7",
-          "Abmaj7", "Abmaj7", "Ebmaj7", "Ebmaj7", "Fm7", "Fm7", "Bb7", "Bb7",
-          "Ebmaj7", "Ebmaj7", "Dm7b5", "G7", "Cm7", "Cm7", "Bbm7", "Eb7",
-          "Abmaj7", "Db7", "Ebmaj7 C7", "Fm7 Bb7", "Ebmaj7", "Fm7", "Bb7", "Bb7"
-        ]
-      },
-      {
-        title: "Giant Steps",
-        measures: 16,
-        chords: [
-          "Bmaj7 D7", "Gmaj7 Bb7", "Ebmaj7", "Am7 D7",
-          "Gmaj7 Bb7", "Ebmaj7 F#7", "Bmaj7", "Fm7 Bb7",
-          "Ebmaj7", "Am7 D7", "Gmaj7", "C#m7 F#7",
-          "Bmaj7", "Fm7 Bb7", "Ebmaj7", "C#m7 F#7"
-        ]
-      },
-      {
-        title: "Blue Bossa",
-        measures: 16,
-        chords: [
-          "Cm7", "Cm7", "Fm7", "Fm7", "Dm7b5", "G7", "Cm7", "Cm7",
-          "Ebm7", "Ab7", "Dbmaj7", "Dbmaj7", "Dm7b5", "G7", "Cm7", "Cm7"
-        ]
-      }
-    ];
-
-    function App() {
-      const [measureCount, setMeasureCount] = useState(32);
-      const [bpm, setBpm] = useState(130);
-      const [chords, setChords] = useState(Array(64).fill(""));
-      const [currentSongTitle, setCurrentSongTitle] = useState("Autumn Leaves");
-      const [v7Approach, setV7Approach] = useState("altered"); // chordtone, altered, condim
-      const [viewMode, setViewMode] = useState("score"); // score, guitar, bass
-      
-      const [abcString, setAbcString] = useState("");
-      const [audioAbcString, setAudioAbcString] = useState("");
-      const [backingAbcString, setBackingAbcString] = useState("");
-      const [isBackingOnly, setIsBackingOnly] = useState(false);
-      
-      const [abcjsLoaded, setAbcjsLoaded] = useState(false);
-      const [isModalOpen, setIsModalOpen] = useState(false);
-
-      const audioRef = useRef(null);
-      const synthRef = useRef(null);
-
-      // 初期ロード（枯葉）
-      useEffect(() => {
-        const song = standardSongs[0];
-        setMeasureCount(song.measures);
-        const newChords = Array(64).fill("");
-        song.chords.forEach((c, i) => { newChords[i] = c; });
-        setChords(newChords);
-        setCurrentSongTitle(song.title);
-      }, []);
-
-      useEffect(() => {
-        if (window.ABCJS) {
-          setAbcjsLoaded(true);
-          return;
-        }
-        const script = document.createElement("script");
-        script.src = "https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-basic-min.js";
-        script.async = true;
-        script.onload = () => setAbcjsLoaded(true);
-        document.body.appendChild(script);
-      }, []);
-
-      useEffect(() => {
-        if (abcjsLoaded && chords[0] !== "" && abcString === "") {
-          generateEtude();
-        }
-      }, [abcjsLoaded, chords]);
-
-      // 再生制御・楽譜レンダリング
-      useEffect(() => {
-        if (abcjsLoaded && abcString && window.ABCJS) {
-          window.ABCJS.renderAbc("paper", abcString, {
-            responsive: "resize",
-            add_classes: true,
-            paddingtop: 10,
-            paddingbottom: 30,
-            paddingleft: 0,
-            paddingright: 0,
-            staffwidth: 820
-          });
-
-          const currentAudioString = isBackingOnly ? backingAbcString : audioAbcString;
-          const visualObjForAudio = window.ABCJS.renderAbc("audio-paper", currentAudioString, {
-            add_classes: true
-          })[0];
-
-          if (window.ABCJS.synth.supportsAudio() && audioRef.current) {
-            if (synthRef.current) {
-              synthRef.current.pause();
-              synthRef.current.disable(true);
-            }
-            audioRef.current.innerHTML = "";
-
-            const cursorControl = {
-              onStart: function() {
-                const svg = document.querySelector("#paper svg");
-                if (svg) {
-                  svg.querySelectorAll(".abcjs-highlight").forEach(n => n.classList.remove("abcjs-highlight"));
-                }
-              },
-              onEvent: function(ev) {
-                if (!ev || (ev.measureStart && ev.left === null)) return;
-                const displaySvg = document.querySelector("#paper svg");
-                const audioSvg = document.querySelector("#audio-paper svg");
-                if (!displaySvg || !audioSvg) return;
-
-                displaySvg.querySelectorAll(".abcjs-highlight").forEach(n => n.classList.remove("abcjs-highlight"));
-
-                if (ev.elements && Array.isArray(ev.elements)) {
-                  const audioNotes = Array.from(audioSvg.querySelectorAll(".abcjs-v0 .abcjs-note, .abcjs-v0 .abcjs-rest"));
-                  const displayNotes = Array.from(displaySvg.querySelectorAll(".abcjs-note, .abcjs-rest"));
-
-                  ev.elements.forEach(element => {
-                    if (!element) return;
-                    let index = audioNotes.indexOf(element);
-                    if (index === -1 && element.closest) {
-                      const parent = element.closest('.abcjs-note, .abcjs-rest');
-                      if (parent) index = audioNotes.indexOf(parent);
-                    }
-                    if (index !== -1 && displayNotes[index]) {
-                      displayNotes[index].classList.add("abcjs-highlight");
-                    }
-                  });
-                }
-              },
-              onFinished: function() {
-                const svg = document.querySelector("#paper svg");
-                if (svg) svg.querySelectorAll(".abcjs-highlight").forEach(n => n.classList.remove("abcjs-highlight"));
-              }
-            };
-
-            const synthControl = new window.ABCJS.synth.SynthController();
-            synthControl.load(audioRef.current, cursorControl, {
-              displayLoop: true,
-              displayRestart: true,
-              displayPlay: true,
-              displayProgress: true,
-              displayWarp: false 
-            });
-
-            synthControl.setTune(visualObjForAudio, false, {
-              chordsOff: true 
-            }).catch(console.error);
-
-            synthRef.current = synthControl;
-          }
-        }
-      }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsLoaded, viewMode]);
-
-      const handleMeasureCountChange = (e) => setMeasureCount(Number(e.target.value));
-      const handleBpmChange = (e) => setBpm(Number(e.target.value));
-      const handleChordChange = (index, value) => {
-        const newChords = [...chords];
-        newChords[index] = value;
-        setChords(newChords);
-        setCurrentSongTitle(""); 
-      };
-
-      const selectStandardSong = (song) => {
-        setMeasureCount(song.measures);
-        const newChords = Array(64).fill("");
-        song.chords.forEach((c, i) => { newChords[i] = c; });
-        setChords(newChords);
-        setCurrentSongTitle(song.title);
-        setIsModalOpen(false);
-      };
-
-      const getMidiOffset = (noteStr) => {
-        const map = {
-          'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
-          'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8,
-          'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
-        };
-        return map[noteStr] || 0;
-      };
-
-      // 和音・スケール解析
-      const getChordDetails = (chordStr) => {
-        if (!chordStr) return { root: 'C', rootMidi: 60, type: 'maj7', chordTones: [60, 64, 67, 71], scale: [60, 62, 64, 65, 67, 69, 71], isV7: false };
-        const match = chordStr.match(/^[A-G][#b]?/);
-        const root = match ? match[0] : 'C';
-        const rootMidi = 60 + getMidiOffset(root);
-        const typeStr = chordStr.substring(root.length);
-
-        let isV7 = false;
-        let intervals = [0, 4, 7, 11]; // maj7 default
-        let scaleIntervals = [0, 2, 4, 5, 7, 9, 11]; // Ionian
-
-        if (typeStr.includes('m7b5') || typeStr.includes('h')) {
-          intervals = [0, 3, 6, 10]; // Locrian
-          scaleIntervals = [0, 1, 3, 5, 6, 8, 10];
-        } else if (typeStr.includes('dim')) {
-          intervals = [0, 3, 6, 9];
-          scaleIntervals = [0, 2, 3, 5, 6, 8, 9, 11];
-        } else if (typeStr.includes('m7') || typeStr.includes('-7')) {
-          intervals = [0, 3, 7, 10]; // Dorian
-          scaleIntervals = [0, 2, 3, 5, 7, 9, 10];
-        } else if (typeStr.includes('maj7') || typeStr.includes('M7') || typeStr.includes('△')) {
-          intervals = [0, 4, 7, 11];
-          scaleIntervals = [0, 2, 4, 5, 7, 9, 11];
-        } else if (typeStr.includes('7') || typeStr.includes('9') || typeStr.includes('13') || typeStr.includes('alt')) {
-          isV7 = true;
-          if (v7Approach === 'altered' || typeStr.includes('alt')) {
-            intervals = [0, 4, 10]; // Root, 3rd, b7
-            scaleIntervals = [0, 1, 3, 4, 6, 8, 10]; // Altered (1, b9, #9, 3, #11, b13, b7)
-          } else if (v7Approach === 'condim') {
-            intervals = [0, 4, 7, 10];
-            scaleIntervals = [0, 1, 3, 4, 6, 7, 9, 10]; // H-W Diminished
-          } else {
-            // pure chordtone & mixolydian
-            intervals = [0, 4, 7, 10, 14, 21]; // R, 3, 5, b7, 9, 13
-            scaleIntervals = [0, 2, 4, 5, 7, 9, 10];
-          }
-        }
-
-        return {
-          root,
-          rootMidi,
-          type: typeStr,
-          chordTones: intervals.map(i => rootMidi + i),
-          scale: scaleIntervals.map(i => rootMidi + i),
-          isV7
-        };
-      };
-
-      // TAB運指算出（ギター: E2=40〜, ベース: E1=28〜）
-      const midiToTab = (midiNote, isBass) => {
-        if (isBass) {
-          // 実音ピッチから1オクターブ下（8vb）でフレット計算
-          const shifted = midiNote - 12;
-          const bassTunings = [43, 38, 33, 28]; // G2, D2, A1, E1
-          for (let s = 0; s < bassTunings.length; s++) {
-            const fret = shifted - bassTunings[s];
-            if (fret >= 0 && fret <= 17) {
-              return { string: s + 1, fret };
-            }
-          }
-          return { string: 4, fret: 0 };
-        } else {
-          // ギター標準チューニング E4=64, B3=59, G3=55, D3=50, A2=45, E2=40
-          const guitarTunings = [64, 59, 55, 50, 45, 40];
-          for (let s = 0; s < guitarTunings.length; s++) {
-            const fret = midiNote - guitarTunings[s];
-            if (fret >= 0 && fret <= 19) {
-              return { string: s + 1, fret };
-            }
-          }
-          return { string: 1, fret: 12 };
-        }
-      };
-
-      const getAbcNoteName = (midi, currentChord, measureAccidentalsRef) => {
-        let isFlatKey = false;
-        if (currentChord) {
-          const match = currentChord.match(/^[A-G][#b]?/);
-          if (match) {
-            const root = match[0];
-            if (['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'].includes(root)) isFlatKey = true;
-            if (currentChord.includes('m') && ['C', 'G', 'D'].includes(root)) isFlatKey = true;
-          }
-        }
-        const noteNames = isFlatKey 
-          ? ['C', 'D', 'D', 'E', 'E', 'F', 'G', 'G', 'A', 'A', 'B', 'B']
-          : ['C', 'C', 'D', 'D', 'E', 'F', 'F', 'G', 'G', 'A', 'A', 'B'];
-        const defaultAccidentals = isFlatKey
-          ? ['', '_', '', '_', '', '', '_', '', '_', '', '_', '']
-          : ['', '^', '', '^', '', '', '^', '', '^', '', '^', ''];
-
-        const octave = Math.floor(midi / 12) - 1;
-        const noteClass = midi % 12;
-        const baseName = noteNames[noteClass];
-        const targetAcc = defaultAccidentals[noteClass];
-
-        let abcName = baseName;
-        if (octave <= 3) {
-          for (let k = 4; k > octave; k--) abcName += ",";
-        } else if (octave === 4) {
-          abcName = baseName;
-        } else if (octave === 5) {
-          abcName = baseName.toLowerCase();
-        } else if (octave >= 6) {
-          abcName = baseName.toLowerCase();
-          for (let k = 5; k < octave; k++) abcName += "'";
-        }
-
-        const key = baseName + octave;
-        const currentAcc = measureAccidentalsRef[key] !== undefined ? measureAccidentalsRef[key] : '';
-        let prefix = "";
-        if (currentAcc !== targetAcc) {
-          prefix = targetAcc === '' ? '=' : targetAcc;
-          measureAccidentalsRef[key] = targetAcc;
-        }
-        return prefix + abcName;
-      };
-
-      const clampBass = (m) => {
-        let n = m;
-        while (n < 28) n += 12;
-        while (n > 48) n -= 12;
-        return n;
-      };
-
-      // 伴奏用和音
-      const getAbcChordVoicing = (chordStr, accRef) => {
-        const info = getChordDetails(chordStr);
-        const tones = info.chordTones.length > 3 ? info.chordTones.slice(1, 4) : info.chordTones;
-        const notesStr = tones.map(m => getAbcNoteName(m - 12, chordStr, accRef)).join("");
-        return "[" + notesStr + "]";
-      };
-
-      // フレーズ生成エンジン（ダイナミックな音域＋ビバップ・ボキャブラリー）
-      const generateEtude = () => {
-        let soloMeasures = []; // 小節ごとのABC文字列配列
-        let audioMeasures = [];
-        let backingMeasures = [];
-
-        // 音域: D3 (50) 〜 A5 (81) で2オクターブ超をフル活用
-        const MIN_NOTE = 50;
-        const MAX_NOTE = 81;
-
-        let currentNote = 64; // E4 付近からスタート
-
-        for (let m = 0; m < measureCount; m++) {
-          const chordStr = chords[m] || "Cmaj7";
-          const chordList = chordStr.split(/\s+/).filter(c => c.length > 0);
-          const firstChord = chordList[0] || "Cmaj7";
-          const chordInfo1 = getChordDetails(firstChord);
-
-          let accV1 = {};
-          let accV2 = {};
-          let accV3 = {};
-
-          let melodyAbc = "";
-          let compAbc = "";
-          let bassAbc = "";
-
-          // --- バッキング生成 ---
-          const bassRoot = 36 + getMidiOffset(chordInfo1.root);
-          if (chordList.length === 1) {
-            compAbc = getAbcChordVoicing(firstChord, accV2) + "8";
-            bassAbc = `${getAbcNoteName(clampBass(bassRoot), firstChord, accV3)}2 ${getAbcNoteName(clampBass(bassRoot + 7), firstChord, accV3)}2 ${getAbcNoteName(clampBass(bassRoot + 4), firstChord, accV3)}2 ${getAbcNoteName(clampBass(bassRoot + 5), firstChord, accV3)}2`;
-          } else {
-            const secondChord = chordList[1];
-            const bassRoot2 = 36 + getMidiOffset(getChordDetails(secondChord).root);
-            compAbc = `${getAbcChordVoicing(firstChord, accV2)}4 ${getAbcChordVoicing(secondChord, accV2)}4`;
-            bassAbc = `${getAbcNoteName(clampBass(bassRoot), firstChord, accV3)}2 ${getAbcNoteName(clampBass(bassRoot + 7), firstChord, accV3)}2 ${getAbcNoteName(clampBass(bassRoot2), secondChord, accV3)}2 ${getAbcNoteName(clampBass(bassRoot2 + 5), secondChord, accV3)}2`;
-          }
-
-          // --- ソロ・メロディ生成（小節ごとのコントゥアー／展開パターン） ---
-          // 0: 急上昇アルペジオ（1.5〜2オクターブ駆け上がり）
-          // 1: スケール下降＋3連ターン（ビバップリック）
-          // 2: 囲み込み（エンクロージャー）＋ドミナントテンション解決
-          // 3: 3連アルペジオ＋ガイドトーン着地
-          const patternType = m % 4;
-          let notesInMeasure = [];
-
-          // 全音域から候補音をフィルタリング
-          const getValidNotes = (sourceList) => {
-            let pool = [];
-            for (let oct = -2; oct <= 2; oct++) {
-              sourceList.forEach(pitch => {
-                const p = pitch + oct * 12;
-                if (p >= MIN_NOTE && p <= MAX_NOTE) pool.push(p);
-              });
-            }
-            return Array.from(new Set(pool)).sort((a,b) => a - b);
-          };
-
-          const availableChordTones = getValidNotes(chordInfo1.chordTones);
-          const availableScaleTones = getValidNotes(chordInfo1.scale);
-
-          // コードネーム注記（1拍目）
-          melodyAbc += `"${firstChord}"`;
-
-          if (patternType === 0) {
-            // 【急上昇アルペジオ】低域からハイポジションへ2オクターブ跳躍
-            let lowTones = availableChordTones.filter(n => n <= 60);
-            let startNote = lowTones.length > 0 ? lowTones[Math.floor(Math.random() * lowTones.length)] : 53;
-            currentNote = startNote;
-            
-            // 8分音符で駆け上がり
-            for (let b = 0; b < 6; b++) {
-              const higherCandidates = availableChordTones.filter(n => n > currentNote);
-              if (higherCandidates.length > 0) {
-                currentNote = higherCandidates[0];
-              } else {
-                currentNote += 2;
-              }
-              notesInMeasure.push({ note: currentNote, isTrip: false });
-            }
-            // 7-8拍目はトップからスケールで一段着地
-            const lowerTones = availableScaleTones.filter(n => n < currentNote);
-            currentNote = lowerTones.length > 0 ? lowerTones[lowerTones.length - 1] : currentNote - 2;
-            notesInMeasure.push({ note: currentNote, isTrip: false });
-            currentNote -= 1;
-            notesInMeasure.push({ note: currentNote, isTrip: false });
-
-            // ABC変換（2音ずつビームで束ねる）
-            for (let i = 0; i < notesInMeasure.length; i += 2) {
-              const n1 = getAbcNoteName(notesInMeasure[i].note, firstChord, accV1);
-              const n2 = getAbcNoteName(notesInMeasure[i+1].note, firstChord, accV1);
-              melodyAbc += `${n1}${n2} `;
-            }
-
-          } else if (patternType === 1) {
-            // 【ビバップ・ターン＆下降リック】強拍に3連ターン装飾を挟んで下降
-            // 拍1: 3連ターン装飾（ターゲット音の周りを 上 -> 原音 -> 下 で回転）
-            let targetPitch = currentNote;
-            const trip1 = targetPitch + 1;
-            const trip2 = targetPitch;
-            const trip3 = targetPitch - 1;
-            melodyAbc += `(3${getAbcNoteName(trip1, firstChord, accV1)}${getAbcNoteName(trip2, firstChord, accV1)}${getAbcNoteName(trip3, firstChord, accV1)} `;
-
-            // 拍2〜4: スケール音を流れるようにステップ下降
-            currentNote = trip3;
-            for (let b = 0; b < 6; b++) {
-              const lowerTones = availableScaleTones.filter(n => n < currentNote);
-              if (lowerTones.length > 0) {
-                currentNote = lowerTones[lowerTones.length - 1];
-              } else {
-                currentNote = availableScaleTones[availableScaleTones.length - 1]; // 折り返し
-              }
-              notesInMeasure.push(currentNote);
-            }
-            melodyAbc += `${getAbcNoteName(notesInMeasure[0], firstChord, accV1)} `;
-            melodyAbc += `${getAbcNoteName(notesInMeasure[1], firstChord, accV1)}${getAbcNoteName(notesInMeasure[2], firstChord, accV1)} `;
-            melodyAbc += `${getAbcNoteName(notesInMeasure[3], firstChord, accV1)}${getAbcNoteName(notesInMeasure[4], firstChord, accV1)} `;
-
-          } else if (patternType === 2) {
-            // 【オルタード／コンディミ解決 & エンクロージャー】
-            if (chordInfo1.isV7) {
-              // V7では特徴的なテンション（b9, #9, #11, b13）を跳躍配置
-              const tensionPool = (v7Approach === 'altered')
-                ? [1, 3, 6, 8] // b9, #9, #11, b13
-                : [1, 3, 6, 9]; // b9, #9, #11, 13
-              
-              const chosenTension = chordInfo1.rootMidi + tensionPool[Math.floor(Math.random() * tensionPool.length)];
-              // ターゲット音（3度またはRoot）へのエンクロージャー
-              const targetTone = chordInfo1.rootMidi + 4; // 3rd
-              melodyAbc += `${getAbcNoteName(chosenTension, firstChord, accV1)}${getAbcNoteName(chosenTension - 1, firstChord, accV1)} `;
-              melodyAbc += `${getAbcNoteName(targetTone + 1, firstChord, accV1)}${getAbcNoteName(targetTone - 1, firstChord, accV1)} `;
-              melodyAbc += `${getAbcNoteName(targetTone, firstChord, accV1)}2 `; // 4分音符で堂々着地
-              melodyAbc += `z2 `; // ブレス（休符）
-              currentNote = targetTone;
-            } else {
-              // 4分音符の歌心＋3連アルペジオ
-              const ct = availableChordTones.filter(n => Math.abs(n - currentNote) < 6)[0] || currentNote;
-              melodyAbc += `${getAbcNoteName(ct, firstChord, accV1)}2 `;
-              melodyAbc += `(3${getAbcNoteName(ct + 4, firstChord, accV1)}${getAbcNoteName(ct + 7, firstChord, accV1)}${getAbcNoteName(ct + 11, firstChord, accV1)} `;
-              melodyAbc += `${getAbcNoteName(ct + 12, firstChord, accV1)}${getAbcNoteName(ct + 9, firstChord, accV1)} `;
-              melodyAbc += `z2 `;
-              currentNote = ct + 9;
-            }
-
-          } else {
-            // 【ワイド・インターバル跳躍からのビバップ・クロマチック】
-            let jumpCandidates = availableChordTones.filter(n => Math.abs(n - currentNote) >= 10 && Math.abs(n - currentNote) <= 17);
-            let jumpNote = jumpCandidates.length > 0 ? jumpCandidates[0] : (currentNote < 65 ? currentNote + 12 : currentNote - 12);
-            
-            melodyAbc += `${getAbcNoteName(currentNote, firstChord, accV1)}${getAbcNoteName(jumpNote, firstChord, accV1)} `;
-            // 3連符で戻る
-            const c1 = jumpNote > currentNote ? jumpNote - 1 : jumpNote + 1;
-            const c2 = jumpNote > currentNote ? jumpNote - 2 : jumpNote + 2;
-            const c3 = jumpNote > currentNote ? jumpNote - 3 : jumpNote + 3;
-            melodyAbc += `(3${getAbcNoteName(c1, firstChord, accV1)}${getAbcNoteName(c2, firstChord, accV1)}${getAbcNoteName(c3, firstChord, accV1)} `;
-            melodyAbc += `${getAbcNoteName(c3 - 1, firstChord, accV1)}${getAbcNoteName(c3 - 2, firstChord, accV1)} `;
-            melodyAbc += `z2 `;
-            currentNote = c3 - 2;
-          }
-
-          soloMeasures.push(melodyAbc + " | ");
-          audioMeasures.push({ v1: melodyAbc + " | ", v2: compAbc + " | ", v3: bassAbc + " | " });
-          backingMeasures.push({ v1: "z8 | ", v2: compAbc + " | ", v3: bassAbc + " | " });
-        }
-
-        // --- 画面表示用ABC文字列（viewModeに応じて排他切り替え） ---
-        let displayHeader = "X: 1\n";
-        displayHeader += `T: ${currentSongTitle || "Jazz Solo Etude"}\n`;
-        displayHeader += "M: 4/4\n";
-        displayHeader += "L: 1/8\n";
-        displayHeader += "K: C\n";
-        displayHeader += "%%staffwidth 820\n";
-        displayHeader += "%%stretchlast 1\n";
-
-        if (viewMode === 'guitar') {
-          displayHeader += "%%score (1)\n";
-          displayHeader += "V: 1 clef=tab-6 stafflines=6 tablabelfont=Helvetica-Bold-12\n";
-        } else if (viewMode === 'bass') {
-          // ベースTAB：4本線、実音より1オクターブ下（8vb）でフレット配置
-          displayHeader += "%%score (1)\n";
-          displayHeader += "V: 1 clef=tab-4 stafflines=4 tablabelfont=Helvetica-Bold-12\n";
-        } else {
-          // 五線譜（標準ト音記号）
-          displayHeader += "%%score (1)\n";
-          displayHeader += "V: 1 clef=treble\n";
-        }
-
-        let fullMelodyStr = "";
-        for (let i = 0; i < soloMeasures.length; i++) {
-          fullMelodyStr += soloMeasures[i];
-          if ((i + 1) % 4 === 0) fullMelodyStr += "\n";
-        }
-        setAbcString(displayHeader + fullMelodyStr);
-
-        // --- シンセ再生用ABC文字列（実音ピッチを100%保持） ---
-        let audioHeader = "X: 1\n";
-        audioHeader += "M: 4/4\n";
-        audioHeader += "L: 1/8\n";
-        audioHeader += `Q: 1/4=${bpm}\n`;
-        audioHeader += "K: C\n";
-        audioHeader += "%%staves (1 2 3)\n";
-        audioHeader += "V: 1 clef=treble\n%%MIDI program 26\n%%MIDI control 7 110\n"; // Jazz Electric Guitar
-        audioHeader += "V: 2 clef=treble\n%%MIDI program 0\n%%MIDI control 7 60\n";  // Piano comping
-        audioHeader += "V: 3 clef=bass\n%%MIDI program 32\n%%MIDI control 7 100\n";  // Acoustic Bass
-
-        let audioV1 = "[V: 1]\n", audioV2 = "[V: 2]\n", audioV3 = "[V: 3]\n";
-        let backingV1 = "[V: 1]\n%%MIDI control 7 0\n", backingV2 = "[V: 2]\n", backingV3 = "[V: 3]\n";
-
-        for (let i = 0; i < audioMeasures.length; i++) {
-          audioV1 += audioMeasures[i].v1;
-          audioV2 += audioMeasures[i].v2;
-          audioV3 += audioMeasures[i].v3;
-
-          backingV1 += backingMeasures[i].v1;
-          backingV2 += backingMeasures[i].v2;
-          backingV3 += backingMeasures[i].v3;
-
-          if ((i + 1) % 4 === 0) {
-            audioV1 += "\n"; audioV2 += "\n"; audioV3 += "\n";
-            backingV1 += "\n"; backingV2 += "\n"; backingV3 += "\n";
-          }
-        }
-
-        setAudioAbcString(audioHeader + audioV1 + audioV2 + audioV3);
-        setBackingAbcString(audioHeader + backingV1 + backingV2 + backingV3);
-      };
-
-      return (
-        <div className="min-h-screen bg-slate-50 print:bg-white text-slate-800 p-4 md:p-8 print:p-0">
-          <div className="max-w-6xl mx-auto space-y-6 print:space-y-0">
-            
-            {/* ヘッダー */}
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4 print:hidden">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-sm">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900">Jazz Solo Etude Generator</h1>
-                  <p className="text-xs text-slate-500">コードトーン・ワイド跳躍・本格ビバップリックによるアドリブ練習ツール</p>
-                </div>
-              </div>
-
-              {/* 譜面切り替えタブ（排他表示） */}
-              <div className="flex bg-slate-200/80 p-1 rounded-xl gap-1 self-start md:self-auto border border-slate-300">
-                <button
-                  onClick={() => setViewMode('score')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${viewMode === 'score' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  五線譜
-                </button>
-                <button
-                  onClick={() => setViewMode('guitar')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${viewMode === 'guitar' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  ギター TAB
-                </button>
-                <button
-                  onClick={() => setViewMode('bass')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${viewMode === 'bass' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                >
-                  ベース TAB (8vb)
-                </button>
-              </div>
-            </header>
-
-            {/* コントロールパネル */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 print:hidden">
-              {/* ドミナント7thアプローチ選択 */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  V7 (ドミナント) アプローチ
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    onClick={() => setV7Approach('chordtone')}
-                    className={`py-2 px-1 text-xs rounded-lg font-medium border text-center transition ${v7Approach === 'chordtone' ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                  >
-                    コードトーン
-                  </button>
-                  <button
-                    onClick={() => setV7Approach('altered')}
-                    className={`py-2 px-1 text-xs rounded-lg font-medium border text-center transition ${v7Approach === 'altered' ? 'bg-purple-50 border-purple-500 text-purple-700 font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                  >
-                    オルタード
-                  </button>
-                  <button
-                    onClick={() => setV7Approach('condim')}
-                    className={`py-2 px-1 text-xs rounded-lg font-medium border text-center transition ${v7Approach === 'condim' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                  >
-                    コンディミ
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-400">※V7コード通過時のテンションと解決フレーズを変化させます</p>
-              </div>
-
-              {/* テンポ＆曲プリセット */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">テンポ: {bpm} BPM</label>
-                  <span className="text-xs text-slate-500 font-medium">{measureCount} 小節</span>
-                </div>
-                <input 
-                  type="range" min="80" max="220" step="5" value={bpm} 
-                  onChange={handleBpmChange} 
-                  className="w-full accent-blue-600 h-2 bg-slate-100 rounded-lg cursor-pointer"
-                />
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="w-full mt-1 px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg border border-slate-200 transition flex items-center justify-center gap-1.5"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-                  曲プリセットから選択 ({currentSongTitle || "カスタム"})
-                </button>
-              </div>
-
-              {/* 生成ボタン */}
-              <div className="flex flex-col justify-end">
-                <button
-                  onClick={generateEtude}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition active:scale-[0.98] flex items-center justify-center gap-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21v-5h5"></path></svg>
-                  エチュードを再生成
-                </button>
-              </div>
-            </div>
-
-            {/* コード編集アコーディオン */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 print:hidden">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  コード進行 ({measureCount} 小節まるごと)
-                </span>
-                <span className="text-[11px] text-slate-400">※1小節に2コードの場合は半角スペース区切り</span>
-              </div>
-              <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 max-h-36 overflow-y-auto pr-1 custom-scrollbar">
-                {Array.from({ length: measureCount }).map((_, i) => (
-                  <div key={i} className="flex flex-col">
-                    <span className="text-[9px] text-slate-400 font-mono pl-1">{i + 1}</span>
-                    <input
-                      type="text"
-                      value={chords[i] || ""}
-                      onChange={(e) => handleChordChange(i, e.target.value)}
-                      placeholder="Cmaj7"
-                      className="border border-slate-200 px-2 py-1 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 楽譜・プレイヤーエリア */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none">
-              {/* オーディオコントロールバー */}
-              <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex flex-wrap justify-between items-center gap-3 print:hidden">
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={isBackingOnly}
-                    onChange={(e) => setIsBackingOnly(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300"
-                  />
-                  <span>伴奏のみ再生（マイナスワン練習）</span>
-                </label>
-
-                <div className="flex items-center gap-3">
-                  <div ref={audioRef}></div>
-                  <button
-                    onClick={() => window.print()}
-                    className="px-3 py-1.5 text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                    PDFで保存
-                  </button>
-                </div>
-              </div>
-
-              {/* 楽譜描画ターゲット */}
-              <div className="p-4 md:p-8 flex justify-center bg-white">
-                <div className="w-full max-w-[860px]">
-                  <div id="paper" className="w-full"></div>
-                  <div id="audio-paper" style={{ position: 'absolute', top: '-9999px', visibility: 'hidden' }}></div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* 曲選択モーダル */}
-          {isModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                  <h2 className="font-bold text-slate-800 text-sm">スタンダード曲を選択</h2>
-                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
-                </div>
-                <div className="p-3 overflow-y-auto custom-scrollbar space-y-1.5">
-                  {standardSongs.map((song, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => selectStandardSong(song)}
                       className="w-full text-left px-4 py-2.5 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition flex justify-between items-center group text-xs font-semibold text-slate-700"
                     >
                       <span>{song.title}</span>
