@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Giants Solo & Clean TAB Etude</title>
+  <title>Jazz Giants Lick & Perfect TAB Etude</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -135,9 +135,7 @@
       'C': []
     };
 
-    // ============================================================================
     // ジャズ・ジャイアンツのフレーズ辞書（2拍セル＝1ハーフ小節単位）
-    // ============================================================================
     const JAZZ_GIANT_HALF_CELLS_BEAT12 = [
       { artist: "Charlie Parker", pattern: "z_8_88", notes: [{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}] },
       { artist: "Wes Montgomery", pattern: "88_trip", notes: [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0},{degIdx:2,oct:0}] },
@@ -208,7 +206,7 @@
         }
       }, [abcjsLoaded, chords]);
 
-      // レンダリング（ベースTABの4本線ハックを含む公式レイヤー描画）
+      // レンダリング
       useEffect(() => {
         if (abcjsLoaded && abcString && window.ABCJS) {
           let tablatureOptions = [];
@@ -220,11 +218,12 @@
               tuning: ['E,', 'A,', 'D', 'G', 'B', 'e']
             }];
           } else if (tabView === 'bass') {
-            // ★ベースの4本線TABを正確に出力させるため、4弦楽器(violin)のエンジンを借りてベースのチューニングを注入
+            // ★ベース4本線化のチューニング設定
+            // ギタープリセットを借りつつ、1〜4弦にG, D, A, Eを割り当て、5〜6弦はダミーで非表示化する
             tablatureOptions = [{
-              instrument: 'violin',
-              label: 'TAB (Bass)',
-              tuning: ['E,', 'A,', 'D', 'G']
+              instrument: 'guitar',
+              label: 'TAB (Bass 8vb)',
+              tuning: ['B,,,', 'F,,,', 'E,,', 'A,,', 'D,', 'G,'] // 6弦〜1弦の順
             }];
           }
 
@@ -238,6 +237,25 @@
             staffwidth: 820,
             tablature: tablatureOptions
           });
+
+          // SVG描画直後に、ベースの場合は下2本の線（5, 6弦）を消去して4本線TABにする
+          if (tabView === 'bass') {
+            const svg = document.querySelector("#paper svg");
+            if (svg) {
+              const tabGroups = svg.querySelectorAll(".abcjs-tablature");
+              tabGroups.forEach(group => {
+                const lines = Array.from(group.querySelectorAll("path, line")).filter(el => {
+                  const box = el.getBBox();
+                  return box.width > 200 && box.height < 3;
+                });
+                lines.sort((a, b) => a.getBBox().y - b.getBBox().y);
+                if (lines.length >= 6) {
+                  lines[lines.length - 1].style.display = "none";
+                  lines[lines.length - 2].style.display = "none";
+                }
+              });
+            }
+          }
 
           const currentAudioString = isBackingOnly ? backingAbcString : audioAbcString;
           const visualObjForAudio = window.ABCJS.renderAbc("audio-paper", currentAudioString, {
@@ -300,7 +318,45 @@
             synthRef.current = synthControl;
           }
         }
-      }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsLoaded, tabView]);
+      }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsLoaded, tabView, showDegrees]);
+
+      // 【完全開放弦回避・弦選択アルゴリズム】
+      const getGuitarString = (midi) => {
+        const tuning = [64, 59, 55, 50, 45, 40]; // 1弦〜6弦
+        let bestString = 1;
+        let bestDist = 999;
+        for (let s = 0; s < 6; s++) {
+          const fret = midi - tuning[s];
+          // ★ フレットが1以上（開放弦0は絶対不許可）かつ20F以内
+          if (fret >= 1 && fret <= 20) {
+            const dist = Math.abs(fret - 7); // 7フレット周辺のボックス運指を優先
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestString = s + 1;
+            }
+          }
+        }
+        return bestString;
+      };
+
+      const getBassString = (midi) => {
+        const bassMidi = midi - 12; // TAB表記用に1オクターブ下
+        const tuning = [43, 38, 33, 28]; // 1弦=G, 2弦=D, 3弦=A, 4弦=E
+        let bestString = 1;
+        let bestDist = 999;
+        for (let s = 0; s < 4; s++) {
+          const fret = bassMidi - tuning[s];
+          // ★ ベースもフレットが1以上（開放弦0不許可）かつ20F以内
+          if (fret >= 1 && fret <= 20) {
+            const dist = Math.abs(fret - 5); // 5フレット周辺のボックス運指を優先
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestString = s + 1;
+            }
+          }
+        }
+        return bestString;
+      };
 
       const getChordToneInfo = (chordStr) => {
         const match = chordStr.match(/^[A-G][#b]?/);
@@ -351,7 +407,6 @@
         }
       };
 
-      // 小節内の臨時記号・ナチュラルを完璧に管理（Giant Stepsのような転調曲で事故らないため）
       const midiToAbcByKey = (midi, keySig, measureAccRef) => {
         const flatsInKey = KEY_FLATS[keySig] || [];
         const pitchClass = midi % 12;
@@ -412,7 +467,6 @@
         return `[${r}${t}${s}]${beats}`;
       };
 
-      // ★ジャズ・フレーズ生成エンジン（開放弦と異常ハイフレットの物理的排除）
       const generateEtude = () => {
         let fullLines = [];
         let audioMelody = "";
@@ -420,17 +474,10 @@
 
         const keySig = currentSong.key || "C";
         
-        // ★生成する音域の厳格な制限
-        // ギター: 4弦10F(F3=53) 〜 1弦20F(C6=84)
-        // ベース: 4弦1F(F2=41) 〜 1弦12F(G4=67)  ※abcjsに合わせた実音域
+        // ギターとベースで生成音域を分ける
         const SAFE_MIN = tabView === 'bass' ? 41 : 53; 
         const SAFE_MAX = tabView === 'bass' ? 67 : 84; 
         
-        // ★開放弦になるピッチは最初から出力させない（これにより0フレットは絶対に発生しない）
-        const OPEN_STRINGS = tabView === 'bass' 
-          ? [40, 45, 50, 55] 
-          : [40, 45, 50, 55, 59, 64];
-
         let prevPitch = tabView === 'bass' ? 48 : 60;
 
         const realizeGiantCell = (cell, chordInfo, accRef, degreeTokensOut) => {
@@ -449,54 +496,42 @@
 
           let abcTokens = [];
 
+          // ★開放弦ゼロ化エンジン：各音高の弦を計算し、ABCに `!strNum!` を付与する
+          const processNote = (actualSemi) => {
+            let p = bestBaseOctave + chordInfo.rootPitch + actualSemi;
+            while (p < SAFE_MIN) p += 12;
+            while (p > SAFE_MAX) p -= 12;
+
+            prevPitch = p;
+            const abc = midiToAbcByKey(p, keySig, accRef);
+            const deg = getExactDegree(p % 12, chordInfo.rootPitch, chordInfo.isV7);
+            degreeTokensOut.push(deg || "·");
+            
+            const strNum = tabView === 'bass' ? getBassString(p) : getGuitarString(p);
+            return tabView !== 'none' ? `!${strNum}!${abc}` : abc;
+          };
+
           if (cell.intervals) {
             cell.intervals.forEach(semi => {
               let actualSemi = semi;
               if (v7Approach === 'condim' && semi === 8) actualSemi = 9;
-
-              let p = bestBaseOctave + chordInfo.rootPitch + actualSemi;
-              while (p < SAFE_MIN) p += 12;
-              while (p > SAFE_MAX) p -= 12;
-              if (OPEN_STRINGS.includes(p)) p += 12 <= SAFE_MAX ? 12 : -12;
-
-              prevPitch = p;
-              const abc = midiToAbcByKey(p, keySig, accRef);
-              const deg = getExactDegree(p % 12, chordInfo.rootPitch, chordInfo.isV7);
-              degreeTokensOut.push(deg || "·");
-              abcTokens.push(abc);
+              abcTokens.push(processNote(actualSemi));
             });
           } else {
             cell.notes.forEach(nSpec => {
-              const semi = chordInfo.basicOffsets[nSpec.degIdx];
-              let p = bestBaseOctave + chordInfo.rootPitch + semi + (nSpec.oct * 12);
-              while (p < SAFE_MIN) p += 12;
-              while (p > SAFE_MAX) p -= 12;
-              if (OPEN_STRINGS.includes(p)) p += 12 <= SAFE_MAX ? 12 : -12;
-
-              prevPitch = p;
-              const abc = midiToAbcByKey(p, keySig, accRef);
-              const deg = getExactDegree(p % 12, chordInfo.rootPitch, chordInfo.isV7);
-              degreeTokensOut.push(deg || "·");
-              abcTokens.push(abc);
+              const semi = chordInfo.basicOffsets[nSpec.degIdx] + (nSpec.oct * 12);
+              abcTokens.push(processNote(semi));
             });
           }
 
           switch (cell.pattern) {
-            case "z_8_88":
-              return `z${abcTokens[0]} ${abcTokens[1]}${abcTokens[2]}`;
-            case "z8_88":
-              return `z${abcTokens[0]} ${abcTokens[1]}${abcTokens[2]}`;
-            case "88_trip":
-              return `${abcTokens[0]}${abcTokens[1]} (3${abcTokens[2]}${abcTokens[3]}${abcTokens[4]}`;
-            case "trip_88":
-              return `(3${abcTokens[0]}${abcTokens[1]}${abcTokens[2]} ${abcTokens[3]}${abcTokens[4]}`;
-            case "4_88":
-              return `${abcTokens[0]}2 ${abcTokens[1]}${abcTokens[2]}`;
-            case "8z_z8":
-              return `${abcTokens[0]}z z${abcTokens[1]}`;
-            case "88_88":
-            default:
-              return `${abcTokens[0]}${abcTokens[1]} ${abcTokens[2]}${abcTokens[3]}`;
+            case "z_8_88": return `z${abcTokens[0]} ${abcTokens[1]}${abcTokens[2]}`;
+            case "z8_88": return `z${abcTokens[0]} ${abcTokens[1]}${abcTokens[2]}`;
+            case "88_trip": return `${abcTokens[0]}${abcTokens[1]} (3${abcTokens[2]}${abcTokens[3]}${abcTokens[4]}`;
+            case "trip_88": return `(3${abcTokens[0]}${abcTokens[1]}${abcTokens[2]} ${abcTokens[3]}${abcTokens[4]}`;
+            case "4_88": return `${abcTokens[0]}2 ${abcTokens[1]}${abcTokens[2]}`;
+            case "8z_z8": return `${abcTokens[0]}z z${abcTokens[1]}`;
+            case "88_88": default: return `${abcTokens[0]}${abcTokens[1]} ${abcTokens[2]}${abcTokens[3]}`;
           }
         };
 
@@ -529,10 +564,12 @@
 
             let finalRoot = (tabView === 'bass' ? 48 : 60) + info2.rootPitch;
             if (finalRoot < SAFE_MIN) finalRoot += 12;
-            if (OPEN_STRINGS.includes(finalRoot)) finalRoot += 12;
             const finalAbc = midiToAbcByKey(finalRoot, keySig, accV1);
             degreeTokens.push("R");
-            half2Str += `${finalAbc}4`;
+            
+            const strNum = tabView === 'bass' ? getBassString(finalRoot) : getGuitarString(finalRoot);
+            const finalFormatted = tabView !== 'none' ? `!${strNum}!${finalAbc}` : finalAbc;
+            half2Str += `${finalFormatted}4`;
           } else {
             const cell1 = JAZZ_GIANT_HALF_CELLS_BEAT12[Math.floor(Math.random() * JAZZ_GIANT_HALF_CELLS_BEAT12.length)];
             half1Str += realizeGiantCell(cell1, info1, accV1, degreeTokens) + " ";
@@ -550,7 +587,7 @@
           const measureLyricStr = degreeTokens.join(" ") + " | ";
 
           fullLines.push({ melody: measureMelodyStr, lyric: measureLyricStr });
-          audioMelody += measureMelodyStr;
+          audioMelody += measureMelodyStr.replace(/!\d+!/g, ''); // 音声用には弦指定を除去
 
           if ((m + 1) % 4 === 0) {
             audioMelody += "\n";
@@ -558,7 +595,6 @@
           }
         }
 
-        // ABC譜面文字列の構築
         let header = "X: 1\n";
         header += `T: ${currentSong.title || "Jazz Solo Etude"}\n`;
         header += "M: 4/4\n";
@@ -592,8 +628,8 @@
         audioH += `Q: 1/4=${bpm}\n`;
         audioH += `K: ${keySig}\n`;
         audioH += "%%staves (1 2)\n";
-        audioH += "V: 1 clef=treble\n%%MIDI program 26\n%%MIDI control 7 115\n"; 
-        audioH += "V: 2 clef=treble\n%%MIDI program 0\n%%MIDI control 7 70\n";   
+        audioH += "V: 1 clef=treble\n%%MIDI program 26\n%%MIDI control 7 115\n"; // Guitar
+        audioH += "V: 2 clef=treble\n%%MIDI program 0\n%%MIDI control 7 70\n";   // Piano Only
 
         setAudioAbcString(audioH + "[V: 1]\n" + audioMelody + "[V: 2]\n" + compingStr);
         setBackingAbcString(audioH + "[V: 1]\n%%MIDI control 7 0\n" + audioMelody + "[V: 2]\n" + compingStr);
@@ -619,8 +655,8 @@
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-900">Jazz Giants Lick & Chord Tone Etude</h1>
-                  <p className="text-xs text-slate-500">ベース純正4本線TAB・開放弦ゼロ保証・ジャズボキャブラリー</p>
+                  <h1 className="text-xl font-bold text-slate-900">Jazz Giants Lick & Perfect TAB Etude</h1>
+                  <p className="text-xs text-slate-500">開放弦0強制回避アルゴリズム搭載・純正ベース4本線・ピアノ伴奏のみ</p>
                 </div>
               </div>
 
