@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jazz Solo Etude - Accurate TAB & Degrees</title>
+  <title>Jazz Solo Etude - Accurate Key & No Open Strings</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -25,11 +25,11 @@
     .abcjs-highlight { fill: #2563eb !important; stroke: #2563eb !important; }
     .abcjs-tempo { display: none !important; }
 
-    /* コードネームと度数ラベルのスタイリング */
+    /* コードネーム・度数表記の配置 */
     .abcjs-chord { font-size: 15px !important; font-weight: 800 !important; fill: #0f172a !important; }
     .abcjs-annotation { font-size: 11px !important; font-weight: 700 !important; fill: #b45309 !important; font-family: sans-serif !important; }
 
-    /* TAB譜スタイル */
+    /* TAB譜 */
     .abcjs-tablature line { stroke: #cbd5e1; }
     .abcjs-tablature text { fill: #0f172a; font-weight: bold; font-family: monospace; font-size: 13px; }
     
@@ -66,9 +66,11 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
+    // スタンダード曲リスト（正しい Key シグネチャを設定）
     const standardSongs = [
       {
         title: "Autumn Leaves",
+        key: "Gm", // ♭が2つ (Bb, Eb)
         measures: 32,
         chords: [
           "Cm7", "F7", "Bbmaj7", "Ebmaj7", "Am7b5", "D7", "Gm7", "Gm7",
@@ -79,6 +81,7 @@
       },
       {
         title: "All The Things You Are",
+        key: "Ab", // ♭が4つ (Bb, Eb, Ab, Db)
         measures: 36,
         chords: [
           "Fm7", "Bbm7", "Eb7", "Abmaj7", "Dbmaj7", "G7", "Cmaj7", "Cmaj7",
@@ -90,6 +93,7 @@
       },
       {
         title: "Donna Lee",
+        key: "Ab",
         measures: 32,
         chords: [
           "Abmaj7", "Abmaj7", "F7", "F7", "Bbm7", "Bbm7", "Bb7", "Bb7",
@@ -100,6 +104,7 @@
       },
       {
         title: "Stella by Starlight",
+        key: "Bb", // ♭が2つ
         measures: 32,
         chords: [
           "Em7b5", "A7", "Cm7", "F7", "Fm7", "Bb7", "Ebmaj7", "Ebmaj7",
@@ -110,6 +115,7 @@
       },
       {
         title: "There Will Never Be Another You",
+        key: "Eb", // ♭が3つ
         measures: 32,
         chords: [
           "Ebmaj7", "Ebmaj7", "Dm7b5", "G7", "Cm7", "Cm7", "Bbm7", "Eb7",
@@ -120,6 +126,7 @@
       },
       {
         title: "Giant Steps",
+        key: "B", // ♯が5つ
         measures: 16,
         chords: [
           "Bmaj7 D7", "Gmaj7 Bb7", "Ebmaj7", "Am7 D7",
@@ -140,7 +147,7 @@
       const [measureCount, setMeasureCount] = useState(32);
       const [bpm, setBpm] = useState(130);
       const [chords, setChords] = useState(Array(64).fill(""));
-      const [currentSongTitle, setCurrentSongTitle] = useState("Autumn Leaves");
+      const [currentSong, setCurrentSong] = useState(standardSongs[0]);
       const [v7Approach, setV7Approach] = useState("altered");
       const [tabView, setTabView] = useState("guitar");
       const [showDegrees, setShowDegrees] = useState(true);
@@ -162,7 +169,7 @@
         const newChords = Array(64).fill("");
         song.chords.forEach((c, i) => { newChords[i] = c; });
         setChords(newChords);
-        setCurrentSongTitle(song.title);
+        setCurrentSong(song);
       }, []);
 
       useEffect(() => {
@@ -183,7 +190,7 @@
         }
       }, [abcjsLoaded, chords]);
 
-      // 譜面レンダリング
+      // 譜面とTABのレンダリング
       useEffect(() => {
         if (abcjsLoaded && abcString && window.ABCJS) {
           let tablatureOptions = [];
@@ -204,7 +211,7 @@
           window.ABCJS.renderAbc("paper", abcString, {
             responsive: "resize",
             add_classes: true,
-            paddingtop: 20,
+            paddingtop: 25,
             paddingbottom: 30,
             paddingleft: 0,
             paddingright: 0,
@@ -275,7 +282,7 @@
         }
       }, [abcString, audioAbcString, backingAbcString, isBackingOnly, abcjsLoaded, tabView]);
 
-      // 厳密な度数判定
+      // 正確な度数解析
       const getAccurateDegreeLabel = (midi, chordStr) => {
         if (!chordStr) return "";
         const match = chordStr.match(/^[A-G][#b]?/);
@@ -309,15 +316,10 @@
         }
       };
 
-      // MIDI音高からABC記譜文字列（オクターブ・変化記号を完全に厳密化）
-      // C4 = MIDI 60 (ABC: C), C5 = MIDI 72 (ABC: c), C3 = MIDI 48 (ABC: C,)
-      const midiToAbc = (midi, chordStr, measureAccRef) => {
-        let isFlatKey = false;
-        if (chordStr) {
-          const match = chordStr.match(/^[A-G][#b]?/);
-          if (match && ['F', 'Bb', 'Eb', 'Ab', 'Db'].includes(match[0])) isFlatKey = true;
-          if (chordStr.includes('m') && ['C', 'G', 'D'].includes(match[0])) isFlatKey = true;
-        }
+      // MIDI音高からABC記譜文字列（オクターブ・変化記号）
+      const midiToAbc = (midi, keySig, measureAccRef) => {
+        // キーシグネチャにフラット系が含まれるか判定
+        const isFlatKey = keySig.includes('m') || keySig.includes('b') || keySig === 'F';
 
         const noteNames = isFlatKey 
           ? ['C', 'D', 'D', 'E', 'E', 'F', 'G', 'G', 'A', 'A', 'B', 'B']
@@ -327,7 +329,7 @@
           : ['', '^', '', '^', '', '', '^', '', '^', '', '^', ''];
 
         const noteClass = midi % 12;
-        const octave = Math.floor(midi / 12) - 1; // 4=octave4(C4=60), 5=octave5(c=72), 3=octave3(C,=48)
+        const octave = Math.floor(midi / 12) - 1;
         const base = noteNames[noteClass];
         const targetAcc = defaultAcc[noteClass];
 
@@ -360,20 +362,21 @@
         return n;
       };
 
-      // フレーズ生成エンジン（開放弦を完全排除・5〜15Fの実戦ポジションに固定）
+      // フレーズ生成エンジン（開放弦の完全排除 ＆ 5〜15フレット固定）
       const generateEtude = () => {
         let displayMelody = "";
         let audioMelody = "";
         let compingStr = "";
         let bassStr = "";
 
-        // ★ギター開放弦(E2=40, A2=45, D3=50, G3=55, B3=59, E4=64)を避けるため、
-        // ジャズギターで最も弾きやすい「5フレット〜15フレット」の王道ポジションに音域を集中
-        // 最低音: 5弦5F (D3 = MIDI 50) 〜 1弦17F (A5 = MIDI 81)
-        const POS_MIN = 50; 
-        const POS_MAX = 81;
+        const keySig = currentSong.key || "C";
 
-        let curMidi = 62; // D4 付近
+        // 開放弦(40, 45, 50, 55, 59, 64)を一切弾かせないための音域設定
+        // ギター中高域のポジション（5フレット〜17フレット = MIDI 57〜84）に設定
+        const POS_MIN = 57; // A3 (4弦7F / 5弦12F)
+        const POS_MAX = 84; // C6 (1弦20F)
+
+        let curMidi = 65; // F4
 
         for (let m = 0; m < measureCount; m++) {
           const chordStr = chords[m] || "Cmaj7";
@@ -390,10 +393,10 @@
           displayMelody += `"${firstChord}"`;
           audioMelody += `"${firstChord}"`;
 
-          // バッキング（ピアノ・ベース）
+          // バッキング
           const bassRoot = 36 + rootMidi;
-          compingStr += `[${midiToAbc(52 + rootMidi, firstChord, accV2)}${midiToAbc(55 + rootMidi, firstChord, accV2)}${midiToAbc(59 + rootMidi, firstChord, accV2)}]8 | `;
-          bassStr += `${midiToAbc(clampBass(bassRoot), firstChord, accV3)}2 ${midiToAbc(clampBass(bassRoot + 7), firstChord, accV3)}2 ${midiToAbc(clampBass(bassRoot + 4), firstChord, accV3)}2 ${midiToAbc(clampBass(bassRoot + 5), firstChord, accV3)}2 | `;
+          compingStr += `[${midiToAbc(52 + rootMidi, keySig, accV2)}${midiToAbc(55 + rootMidi, keySig, accV2)}${midiToAbc(59 + rootMidi, keySig, accV2)}]8 | `;
+          bassStr += `${midiToAbc(clampBass(bassRoot), keySig, accV3)}2 ${midiToAbc(clampBass(bassRoot + 7), keySig, accV3)}2 ${midiToAbc(clampBass(bassRoot + 4), keySig, accV3)}2 ${midiToAbc(clampBass(bassRoot + 5), keySig, accV3)}2 | `;
 
           const pattern = m % 4;
 
@@ -402,19 +405,19 @@
             while (safeMidi > POS_MAX) safeMidi -= 12;
             while (safeMidi < POS_MIN) safeMidi += 12;
 
-            const abc = midiToAbc(safeMidi, firstChord, accV1);
+            const abc = midiToAbc(safeMidi, keySig, accV1);
             const degree = showDegrees ? getAccurateDegreeLabel(safeMidi, firstChord) : "";
             
-            // ★度数は音符の下に配置（_ "R"）してコードネームとの重なりを物理的に防止
+            // 度数を音符の直下に注記（_ "度数"）
             const annot = degree ? `_"${degree}"` : "";
             return { display: `${annot}${abc}${duration}`, audio: `${abc}${duration}` };
           };
 
           if (pattern === 0) {
-            // 【弦移動アルペジオ】4弦〜1弦を自然に渡りながら上昇（横スライド・開放弦なし）
-            let baseP = 55 + rootMidi; // 4弦7F〜
+            // 【弦移動アルペジオ（ボックス運指・開放弦皆無）】
+            let baseP = 58 + rootMidi; // 3弦・2弦・1弦ポジション
             while (baseP < POS_MIN) baseP += 12;
-            while (baseP > 64) baseP -= 12;
+            while (baseP > 67) baseP -= 12;
 
             let n1 = formatNote(baseP);
             let n2 = formatNote(baseP + 4);
@@ -478,7 +481,7 @@
 
           } else {
             // 【跳躍 & 3連クロマチック】
-            let jump = curMidi < 65 ? curMidi + 12 : curMidi - 12;
+            let jump = curMidi < 70 ? curMidi + 12 : curMidi - 12;
             const n1 = formatNote(curMidi);
             const n2 = formatNote(jump);
             const c1 = formatNote(jump - 1);
@@ -499,15 +502,15 @@
           }
         }
 
-        // ABCヘッダー（コードネームの位置を上に引き上げ、度数との干渉を完全排除）
+        // ABCヘッダー（調号 K: とコードネーム間隔の調整）
         let header = "X: 1\n";
-        header += `T: ${currentSongTitle || "Jazz Solo Etude"}\n`;
+        header += `T: ${currentSong.title || "Jazz Solo Etude"}\n`;
         header += "M: 4/4\n";
         header += "L: 1/8\n";
-        header += "K: C\n";
+        header += `K: ${keySig}\n`;      // ★選択曲に応じた調号（ト音記号の横に♭や♯が正しく並ぶ）
         header += "%%staffwidth 820\n";
         header += "%%stretchlast 1\n";
-        header += "%%gchord 28\n";       // コードネームを五線から28px上に離す
+        header += "%%gchord 32\n";       // ★コードネームを五線から32px上に配置し衝突を防止
         header += "%%annotationfont 11\n";
         setAbcString(header + displayMelody);
 
@@ -515,7 +518,7 @@
         audioH += "M: 4/4\n";
         audioH += "L: 1/8\n";
         audioH += `Q: 1/4=${bpm}\n`;
-        audioH += "K: C\n";
+        audioH += `K: ${keySig}\n`;
         audioH += "%%staves (1 2 3)\n";
         audioH += "V: 1 clef=treble\n%%MIDI program 26\n%%MIDI control 7 115\n";
         audioH += "V: 2 clef=treble\n%%MIDI program 0\n%%MIDI control 7 55\n";
@@ -530,7 +533,7 @@
         const newChords = Array(64).fill("");
         song.chords.forEach((c, i) => { newChords[i] = c; });
         setChords(newChords);
-        setCurrentSongTitle(song.title);
+        setCurrentSong(song);
         setIsModalOpen(false);
       };
 
@@ -546,7 +549,7 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">Jazz Solo & TAB Etude</h1>
-                  <p className="text-xs text-slate-500">開放弦完全排除・ボックス運指・正確なコードトーン/テンション解析</p>
+                  <p className="text-xs text-slate-500">正確な調号（Key記号）・開放弦完全排除・ボックス運指</p>
                 </div>
               </div>
 
@@ -576,11 +579,11 @@
               </div>
             </header>
 
-            {/* コントロールバー */}
+            {/* コントロールパネル */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 print:hidden">
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  V7 アプローチ
+                  V7 (ドミナント) アプローチ
                 </label>
                 <div className="grid grid-cols-3 gap-1.5">
                   <button
@@ -606,7 +609,9 @@
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">テンポ: {bpm} BPM</label>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    テンポ: {bpm} BPM (Key: {currentSong.key || "C"})
+                  </label>
                   <span className="text-xs text-slate-500 font-medium">{measureCount} 小節</span>
                 </div>
                 <input 
@@ -618,7 +623,7 @@
                   onClick={() => setIsModalOpen(true)}
                   className="w-full mt-1 px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg border border-slate-200 transition"
                 >
-                  スタンダード曲から選択 ({currentSongTitle || "カスタム"})
+                  スタンダード曲から選択 ({currentSong.title || "カスタム"})
                 </button>
               </div>
 
@@ -698,7 +703,10 @@
                       onClick={() => selectSong(song)}
                       className="w-full text-left px-4 py-2.5 rounded-xl hover:bg-blue-50 hover:text-blue-700 transition flex justify-between items-center group text-xs font-semibold text-slate-700"
                     >
-                      <span>{song.title}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{song.title}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">({song.key})</span>
+                      </div>
                       <span className="text-[11px] px-2 py-0.5 bg-slate-100 group-hover:bg-blue-100 text-slate-500 group-hover:text-blue-700 rounded-md">
                         {song.measures} 小節
                       </span>
