@@ -158,6 +158,15 @@
       { artist: "Triplet Drop 7th", pattern: "trip_88", notes: [{degIdx:0,oct:0},{degIdx:2,oct:-1},{degIdx:1,oct:-1},{degIdx:0,oct:-1},{degIdx:3,oct:-2}] }
     ];
 
+    const V7_CHORDTONE_CELLS = [
+      { pattern: "88_88", intervals: [0, 4, 7, 10] },
+      { pattern: "88_88", intervals: [10, 7, 4, 0] },
+      { pattern: "88_88", intervals: [4, 7, 12, 10] },
+      { pattern: "88_88", intervals: [7, 10, 12, 16] },
+      { pattern: "trip_88", intervals: [4, 7, 10, 12, 10] },
+      { pattern: "z8_88", intervals: [10, 12, 16] }
+    ];
+
     const V7_ALTERED_CELLS = [
       { pattern: "88_88", intervals: [8, 3, 1, 4] },
       { pattern: "trip_88", intervals: [3, 1, 0, -2, 4] },
@@ -181,9 +190,9 @@
       const [chords, setChords] = useState(Array(64).fill(""));
       const [currentSong, setCurrentSong] = useState(standardSongs[0]);
       
-      const [arpeggioMode, setArpeggioMode] = useState("7th"); // "triad", "7th", "ust"
-      const [v7Approach, setV7Approach] = useState("chordtone"); // chordtone, altered, condim
-      const [tabView, setTabView] = useState("guitar"); // guitar, bass, none
+      const [arpeggioMode, setArpeggioMode] = useState("7th"); 
+      const [v7Approach, setV7Approach] = useState("chordtone"); 
+      const [tabView, setTabView] = useState("guitar"); 
       const [showDegrees, setShowDegrees] = useState(true);
       
       const [abcString, setAbcString] = useState("");
@@ -455,6 +464,9 @@
         });
       };
 
+      // ============================================================================
+      // ★ 運指アルゴリズムの最適化（ホームポジションの引力を追加）
+      // ============================================================================
       const calcBestGuitarTab = (midi, prevFretRef) => {
         const openPitches = [64, 59, 55, 50, 45, 40];
         let candidates = [];
@@ -463,14 +475,15 @@
           const fret = midi - openPitches[s];
           if (fret >= 6 && fret <= 20) {
             const distFromPrev = Math.abs(fret - prevFretRef.current);
-            candidates.push({ string: s + 1, fret, score: distFromPrev });
+            const positionPenalty = Math.abs(fret - 9) * 0.3; // 9F周辺をホームとする引力
+            candidates.push({ string: s + 1, fret, score: distFromPrev + positionPenalty });
           }
         }
 
         if (candidates.length > 0) {
           candidates.sort((a, b) => a.score - b.score);
           const chosen = candidates[0];
-          prevFretRef.current = prevFretRef.current * 0.6 + chosen.fret * 0.4;
+          prevFretRef.current = prevFretRef.current * 0.7 + chosen.fret * 0.3;
           return { string: chosen.string, fret: chosen.fret };
         }
         return { string: 6, fret: Math.max(6, midi - 40) };
@@ -486,19 +499,20 @@
 
         for (let s = 0; s < 4; s++) {
           const fret = bassMidi - openPitches[s];
-          if (fret >= 2 && fret <= 12) {
+          if (fret >= 2 && fret <= 14) { // 14Fまで上限を拡張
             const distFromPrev = Math.abs(fret - prevFretRef.current);
-            candidates.push({ string: s + 1, fret, score: distFromPrev });
+            const positionPenalty = Math.abs(fret - 7) * 0.5; // 7F周辺をホームとする強い引力
+            candidates.push({ string: s + 1, fret, score: distFromPrev + positionPenalty });
           }
         }
 
         if (candidates.length > 0) {
           candidates.sort((a, b) => a.score - b.score);
           const chosen = candidates[0];
-          prevFretRef.current = prevFretRef.current * 0.6 + chosen.fret * 0.4;
+          prevFretRef.current = prevFretRef.current * 0.7 + chosen.fret * 0.3;
           return { string: chosen.string, fret: chosen.fret };
         }
-        return { string: 1, fret: Math.min(12, Math.max(2, bassMidi - 43)) };
+        return { string: 1, fret: Math.min(14, Math.max(2, bassMidi - 43)) };
       };
 
       const getChordToneInfo = (chordStr) => {
@@ -512,7 +526,6 @@
         const isMajor = type.includes('maj') || type.includes('M7') || type.includes('△');
         const isV7 = type.includes('7') && !isMinor && !isMajor && !isDim;
 
-        // 9thの半音オフセット (m7b5, dimの場合はb9)
         let ninthOffset = 2;
         if (type.includes('m7b5') || type.includes('dim')) ninthOffset = 1; 
 
@@ -521,7 +534,7 @@
           isMinor || isDim ? 3 : 4,
           isDim ? 6 : 7,
           isMajor ? 11 : (type.includes('dim7') ? 9 : 10),
-          ninthOffset // degIdx: 4
+          ninthOffset
         ];
 
         return {
@@ -623,8 +636,10 @@
         const SAFE_MAX = tabView === 'bass' ? 67 : 84; 
         
         let prevPitch = tabView === 'bass' ? 48 : 60;
-        const prevGuitarFretRef = { current: 7 };
-        const prevBassFretRef = { current: 5 };
+        
+        // ★初期ボックスアンカー位置の最適化
+        const prevGuitarFretRef = { current: 8 }; 
+        const prevBassFretRef = { current: 7 }; 
 
         let execPlan = [];
         for (let m = 0; m < measureCount; m++) {
@@ -642,7 +657,6 @@
           const nextInfo = getChordToneInfo(execPlan[i+1].chordStr);
           const interval = (nextInfo.rootPitch - currInfo.rootPitch + 12) % 12;
 
-          // 4度進行 (60%の確率でガイドトーン解決)
           if (interval === 5) {
             if (Math.random() < 0.60) {
               if (arpeggioMode === '7th' || arpeggioMode === 'ust') {
@@ -694,7 +708,8 @@
             while (p < SAFE_MIN) p += 12;
             while (p > SAFE_MAX) p -= 12;
             
-            if (p === prevPitch) p = (p + 12 <= SAFE_MAX) ? p + 12 : (p - 12 >= SAFE_MIN ? p - 12 : p);
+            // ★ 不自然なオクターブジャンプ回避処理を削除 (同音を許容する)
+            // if (p === prevPitch) p = (p + 12 <= SAFE_MAX) ? p + 12 : (p - 12 >= SAFE_MIN ? p - 12 : p);
             
             prevPitch = p;
             const abc = midiToAbcByKey(p, keySig, accRef);
@@ -709,26 +724,22 @@
             return abc;
           };
 
-          // ★V7のアプローチ（オルタード、コンディミ）が選択されている場合はそのまま適用
-          if (cell.intervals) {
+          if (cell.intervals && arpeggioMode !== 'triad' && arpeggioMode !== 'ust') {
             cell.intervals.forEach(semi => {
               let actualSemi = semi;
               if (v7Approach === 'condim' && semi === 8) actualSemi = 9;
               abcTokens.push(appendNote(actualSemi));
             });
           } else {
-            // トライアド / UST モードに応じた度数変換
             const notesToUse = cell.notes || [{degIdx:0,oct:0},{degIdx:1,oct:0},{degIdx:2,oct:0},{degIdx:3,oct:0}]; 
             notesToUse.forEach(nSpec => {
               let actualDegIdx = nSpec.degIdx;
               let actualOct = nSpec.oct;
 
               if (arpeggioMode === 'triad' && actualDegIdx === 3) {
-                // 7th -> Root(1oct上) に置換
                 actualDegIdx = 0;
                 actualOct += 1;
               } else if (arpeggioMode === 'ust' && actualDegIdx === 0) {
-                // Root -> 9th (degIdx:4) に置換
                 actualDegIdx = 4; 
               }
 
@@ -772,9 +783,7 @@
           
           let half2Str = plan1.chordStr !== plan2.chordStr ? `"${plan2.chordStr}"` : "";
 
-          // 最終小節の終わり
           if (i >= execPlan.length - 2) {
-            // USTモード時は最後の音も9thにする
             let offset = arpeggioMode === 'ust' ? info2.basicOffsets[4] : 0; 
             let finalRoot = (tabView === 'bass' ? 48 : 60) + info2.rootPitch + offset;
             if (finalRoot < SAFE_MIN) finalRoot += 12;
@@ -785,10 +794,8 @@
           } else {
             let cell2List;
             if (info2.isV7 && v7Approach !== 'chordtone') {
-              // オルタード/コンディミが選ばれていれば、モードに関わらず強制適用
               cell2List = v7Approach === 'altered' ? V7_ALTERED_CELLS : V7_CONDIM_CELLS;
             } else {
-              // 通常のアプローチ（モードによる自動変換が適用される）
               cell2List = JAZZ_GIANT_HALF_CELLS_BEAT34;
             }
             half2Str += realizeGiantCell(cell2List, info2, accV1, degreeTokens, plan2.forceStart3rd, plan2.forceEnd7th, plan2.forceEnd5th);
